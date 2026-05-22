@@ -1,0 +1,476 @@
+# BUFS 규정관리 시스템 — DB 스키마 문서
+
+> 최종 수정: 2026-04-17
+> 버전: v2.2 (article_history 표준 헤더 반영, 각종 오기 수정)
+> 원본: `Code_web.js` + 관련 마이그레이션/빌더 스크립트 기준 정리
+
+---
+
+## 시트 목록
+
+| # | 시트명 | 역할 | 상태 |
+|---|--------|------|------|
+| 1 | `regulations` | 규정 메타정보 | 운영 중 |
+| 2 | `article_draft` | 조문 초안 (드래프트) | 운영 중 |
+| 3 | `history` | 규정 개정 이력 요약 | 운영 중 |
+| 4 | `article_history` | 조/항/호/목 단위 이력 | 운영 중 |
+| 4-1 | `article_annotation_history` | 조문 주석/부기 이력 | 레거시/참조용 |
+| 5 | `amendment` | 개정 차수 | 운영 중 |
+| 6 | `amendment_item` | 차수별 규정 개정안 | 운영 중 |
+| 6-1 | `drafter_item` | 입안자 입안서 임시 저장 | 운영 중 |
+| 7 | `article` | 현행 조문 (`syncArticle_()` 자동 생성) | 운영 중 |
+| 8 | `attachments` | 현행 별표·별지 첨부파일 | 운영 중 |
+| 8-1 | `attachment_history` | 첨부파일 이력 원장 | 운영 중 |
+| 9 | `category` | 규정 분류 체계 | 운영 중 |
+| 10 | `organization` | 직제보직 정보 | 운영 중 |
+| 11 | `validation_log` | 검증 로그 | 운영 중 |
+| 12 | `audit_log` | 관리자 작업 감사 로그 | 운영 중 |
+
+---
+
+## 1. `regulations` — 규정 메타정보
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `reg_id` | Integer | 규정 고유 ID | PK, 예: `1001` |
+| `reg_name` | String | 규정명 | 예: "부산외국어대학교 학칙" |
+| `category_no` | Integer | 대분류 번호 | FK → category.category_no |
+| `category` | String | 대분류 | 예: "학사", "재정" |
+| `category_sub_no` | Integer | 소분류 번호 | FK → category.category_sub_no |
+| `category_sub` | String | 소분류 | |
+| `dept` | String | 담당 부서 | |
+| `approval_path` | String | 결재 경로 | 예: "총장", "이사장" |
+| `status` | String | 규정 상태 | `시행중` \| `폐지` |
+| `enacted_date` | String | 제정일 | `YYYY.MM.DD.` 형식 |
+| `revised_date` | String | 최종 개정일 | `YYYY.MM.DD.` 형식 |
+| `effective_date` | String | 시행일 | `YYYY.MM.DD.` 형식 |
+| `current_version` | Integer | 현행 개정차수 | history 시트 기준 |
+| `updated_at` | DateTime | 최종 수정일시 | `YYYY-MM-DD HH:mm:ss` |
+| `pdf_url` | String | PDF 파일 URL | Google Drive 다운로드 링크 |
+
+---
+
+## 2. `article_draft` — 조문 초안
+
+> `saveDraft_()` 가 관리. `amendment_id` 기준 행 삭제 후 재삽입.
+> `publishDraft_()` 완료 후 해당 amendment_id 행 삭제됨.
+> **현재 master는 `amendment_item.draft_data`(JSON).** 이 시트는 게시 직전 단계에서 draft rows를 임시 저장하는 중간 저장소 역할만 수행한다.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `amendment_id` | String | 개정안 ID | FK → amendment_item.item_id (S-4 이후) |
+| `reg_id` | Integer | 규정 ID | FK → regulations.reg_id |
+| `sort_key` | String | 정렬 키 | 예: `0005-00-001-001-00` |
+| `article_no` | String | 조 번호 | 예: "5", "5의2" |
+| `article_title` | String | 조명(제목) | |
+| `paragraph_no` | Integer | 항 번호 | 0 = 본문 |
+| `item_no` | String | 호 번호 | |
+| `subitem_no` | String | 목 번호 | 예: "가", "나" |
+| `content` | String | 조문 내용 | |
+| `chapter` | String | 장 번호 | |
+| `chapter_title` | String | 장 제목 | |
+| `section` | String | 절 번호 | |
+| `section_title` | String | 절 제목 | |
+| `subsection` | String | 관 번호 | |
+| `subsection_title` | String | 관 제목 | |
+| `change_type` | String | 변경 유형 | 신설/개정/현행유지/삭제/본조신설/본조삭제/전문개정/제정/전부개정/폐지 |
+| `review_status` | String | 검토 상태 | `pending` \| `confirmed` |
+| `current_rows` | String | 현행 조문 JSON | 셀 단위 diff 비교용 원본 |
+| `updated_at` | DateTime | 저장 일시 | |
+
+---
+
+## 3. `history` — 규정 개정 이력 요약
+
+> 규정 단위 개정 이력. 게시(`publishDraft_`) 및 폐지 게시(`publishAbrogation_`) 시 upsert.
+> **B-5 개선 후:** `saveAmendmentItem` 시 미리 행 생성 → revision_date 입력 시 change_date 업데이트 → 게시 시 나머지 컬럼 채움.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `reg_id` | Integer | 규정 ID | FK → regulations.reg_id |
+| `reg_name` | String | 규정명 | 비정규화 (조회 편의) |
+| `round_id` | String | 개정 차수 ID | FK → amendment.amendment_id |
+| `version` | Integer | 개정차수 번호 | 예: 1, 2, 3 |
+| `change_date` | String | 개정일 | `YYYY.MM.DD.` 형식 |
+| `change_type` | String | 개정 유형 | 제정/개정/전부개정/폐지 — `publishDraft_()`가 `일부개정`을 `개정`으로 정규화 |
+| `content` | String | 부칙(시행일 포함) | 예: "이 규정은 2026년 3월 1일부터 시행한다." |
+| `updated_at` | DateTime | 최종 수정일시 | |
+| `has_digitalfile` | String | 디지털 원본 보유 여부 | `Y`/빈칸 — `has_digital` 아님. `String(r).trim().toUpperCase() === "Y"` 로 판정 |
+| `pdf_url` | String | 본문 PDF URL | Google Drive 링크 |
+| `effective_date` | String | 시행일 | `YYYY.MM.DD.` 형식. 코드에서 없으면 자동 추가 |
+
+**주의:** 구 스키마의 `amend_no`, `revised_date`, `reason`, `approver` 컬럼은 실제 시트에 없음.
+
+---
+
+## 4. `article_history` — 조문 이력
+
+> 조/항/호/목 단위 행. `publishDraft_()`가 draft rows를 삽입하고 이전 active 행을 superseded 처리.
+> `syncArticle_()`이 active 행을 집계하여 `article` 시트를 재생성.
+> `Code_web.js`가 직접 생성/보장하는 기본 헤더는 아래 컬럼이며, 마이그레이션 이력에 따라 추가 컬럼이 공존할 수 있다.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `reg_id` | Integer | 규정 ID | FK → regulations.reg_id |
+| `round_id` | String | 개정 차수 ID | FK → amendment.amendment_id (롤백 식별용) |
+| `version` | Integer | 개정차수 번호 | |
+| `chapter` | String | 장 번호 | |
+| `chapter_title` | String | 장 제목 | |
+| `section` | String | 절 번호 | |
+| `section_title` | String | 절 제목 | |
+| `subsection` | String | 관 번호 | |
+| `subsection_title` | String | 관 제목 | |
+| `article_no` | String | 조 번호 | 예: "5", "5의2" |
+| `article_title` | String | 조명(제목) | |
+| `paragraph_no` | Integer | 항 번호 | 0 = 본문 |
+| `item_no` | String | 호 번호 | |
+| `subitem_no` | String | 목 번호 | |
+| `content` | String | 조문 내용 | |
+| `sort_key` | String | 정렬 키 | 예: `0005-00-001-001-00` |
+| `change_type` | String | 변경 유형 | 신설/삭제/개정/현행유지/본조신설/본조삭제/전문개정/제정/전부개정/폐지 |
+| `change_date` | String | 개정일 | `YYYY.MM.DD.` 형식 |
+| `prev_article_no` | String | 이전 조 번호 | 조번호 이동 추적용 |
+| `moved_to_article_no` | String | 이동 후 조 번호 | 조번호 이동 추적용 |
+| `change_origin` | String | 변경 원천 | 예: `admin`, `builder` |
+| `review_needed` | String | 검토 필요 여부 | |
+| `review_note` | String | 검토 메모 | |
+| `record_status` | String | 행 상태 | `active` \| `superseded` |
+| `updated_at` | DateTime | 최종 수정일시 | ISO 문자열 |
+
+> **주의:** `revision_dates`는 이 시트가 아니라 `article` 시트(`syncArticle_()` 결과)에 속한다.
+>
+> 위 컬럼 목록은 `Code_web.js`의 `ARTICLE_HISTORY_HEADERS` 상수를 기준으로 한다.
+
+**롤백 식별:** `reg_id + round_id` 조합으로 특정 게시 이벤트의 행 집합을 유일하게 식별 (S-5 게시 취소 참조).
+
+**본조삭제 판정:** `getArticleHistory_()`에서 `record_status=active` 행 전부가 `change_type=삭제`이면 본조삭제로 판정.
+
+---
+
+## 5. `amendment` — 개정 차수
+
+> 개정 차수(회차) 단위 컨테이너. `saveAmendment_`로 생성/수정, `deleteAmendment_`로 연관 items 포함 삭제.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `amendment_id` | String | 차수 고유 ID | PK, 예: `RND-2026-001` |
+| `amendment_name` | String | 차수명 | 예: "2026년 제1차 개정" |
+| `memo` | String | 메모 | |
+| `created_at` | DateTime | 생성일시 | |
+| `status` | String | 차수 상태 | `활성` \| `완료` \| `취소` |
+
+---
+
+## 6. `amendment_item` — 차수별 규정 개정안
+
+> 관리자가 drafter_item을 접수(`intakeDrafterItems_`)하면 생성되는 안건 단위 시트.
+> `draft_data`(JSON)가 조문 편집 내용의 master. `article_draft`는 게시 직전 중간 저장소 역할만 함.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `item_id` | String | 개정안 고유 ID | PK |
+| `amendment_id` | String | 차수 ID | FK → amendment.amendment_id |
+| `reg_id` | Integer | 규정 ID | FK → regulations.reg_id (제정은 빈값) |
+| `amendment_type` | String | 개정 유형 | 일부개정/전부개정/제정/폐지 |
+| `approver_type` | String | 결재권자 | `총장` \| `이사장` |
+| `revision_date` | String | 결재일 | `YYYY.MM.DD.` 형식 |
+| `effective_date` | String | 시행일 | `YYYY.MM.DD.` 형식 |
+| `new_reg_name` | String | 변경할 규정명 | 일부개정·전부개정 시 규정명 변경이 있을 때만 기입. 빈값이면 변경 없음. |
+| `workflow_status` | String | 진행 상태 | DRAFTED/EDITING/VALIDATING/APPROVED/PUBLISHED |
+| `draft_data` | String | 조문 초안 JSON | **현재 master** — `article_draft`를 대체 |
+| `confirmed_at` | DateTime | APPROVED 전환 일시 | |
+| `published_at` | DateTime | PUBLISHED 일시 | |
+| `item_order` | Integer | 차수 내 안건 순서 | 회의 자료 안건번호 기준. 관리자 드래그앤드롭으로 변경 |
+| `source_drafter_item_id` | String | 원본 입안서 ID | FK → `drafter_item.item_id` |
+
+**상태 흐름:**
+```
+DRAFTED → EDITING → VALIDATING → APPROVED → PUBLISHED
+```
+
+**관련 GAS 액션:**
+
+| action | method | 인증 | 설명 |
+|--------|--------|------|------|
+| `getAmendments` | POST | auth_token | amendment + amendment_item 전체 반환 (draft_data 제외) |
+| `intakeDrafterItems` | POST | auth_token 또는 pw | drafter_item → amendment_item 이관 + 차수 자동 생성 |
+| `updateItemOrder` | POST | auth_token 또는 pw | amendment_item 안건 순서 저장 |
+
+---
+
+## 6-1. `drafter_item` — 입안자 입안서 임시 저장
+
+> 입안자가 입안서를 작성하는 동안 임시 저장하는 시트. `amendment_item`과 완전 분리.
+> 관리자가 접수하면 해당 데이터를 `amendment_item`으로 이관하고 이 시트에서는 참조용으로 유지.
+> `amendment_id` FK 없음 — 차수 미배정 상태에서 입안자가 자유롭게 작성 가능.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `item_id` | String | 입안서 고유 ID | PK, 예: `DI-1743480000000` |
+| `reg_id` | String | 규정 ID | FK → regulations.reg_id. 제정 시 `DRAFT-{timestamp}` |
+| `amendment_type` | String | 개정 유형 | 일부개정/전부개정/제정/폐지 |
+| `approver_type` | String | 결재권자 | `총장` \| `이사장` |
+| `revision_date` | String | 결재일 (희망) | `YYYY.MM.DD.` 형식. 미확정 시 빈값 |
+| `effective_date` | String | 시행일 | `YYYY.MM.DD.` 형식 |
+| `effective_date_auto` | Boolean | 시행일 자동 반영 | `TRUE`: 결재일로 자동 설정 |
+| `new_reg_name` | String | 변경할 규정명 | 일부개정·전부개정 시 규정명 변경이 있을 때만 기입. amendment_item 이관 후 유지. |
+| `workflow_status` | String | 진행 상태 | `DRAFTED` \| `EDITING` \| `REJECTED` \| `ACCEPTED` |
+| `submitter_dept` | String | 입안자 부서 | 내 입안서 필터링 기준 |
+| `submitter_name` | String | 입안자 이름 | 표시용 |
+| `draft_reason` | String | 개정 사유 | 입안서 기본정보 |
+| `draft_data` | String (JSON) | 조문 편집 내용 | rows 배열 + supplement + validation_results |
+| `draft_attachments` | String (JSON) | 별표·별지 임시 저장 | PUBLISHED 시 attachments 시트로 이관 예정 |
+| `reject_reason` | String | 관리자 반려 사유 | REJECTED 전환 시 저장 |
+| `submitted_at` | DateTime | 제출 일시 | EDITING 전환 시점 |
+| `created_at` | DateTime | 생성 일시 | |
+| `updated_at` | DateTime | 최종 수정 일시 | |
+
+**상태 흐름:**
+```
+DRAFTED (입안자 작성 중)
+  → EDITING (입안자 제출 완료, 관리자 검토 대기)
+  → REJECTED (관리자 반려)
+  → DRAFTED (재제출 가능)
+  → ACCEPTED (관리자 접수 후 차수 이관 완료)
+```
+
+**`draft_data` JSON 구조:**
+```json
+{
+  "rows": [
+    {
+      "sort_key": "0001-00-001-000-00",
+      "article_no": "1", "article_title": "목적",
+      "paragraph_no": 0, "item_no": "", "subitem_no": "",
+      "chapter": "1", "chapter_title": "총칙",
+      "section": "", "section_title": "",
+      "subsection": "", "subsection_title": "",
+      "content": "이 규정은...",
+      "change_type": "개정", "review_status": "pending",
+      "current_rows": "[{...}]"
+    }
+  ],
+  "supplement": "이 규정은 2026년 4월 1일부터 시행한다.",
+  "parsed_at": "2026-04-01T12:00:00",
+  "validation_results": {
+    "checked_at": "2026-04-01T12:05:00",
+    "items": [{"rule_code": "ART_NO_CONTINUITY", "severity": "err", "article_no": "5", "message": "..."}],
+    "ignored": [{"rule_code": "JEONBU_THRESHOLD", "ignore_reason": "담당자 확인 완료"}]
+  }
+}
+```
+
+---
+
+## 7. `article` — 현행 조문
+
+> `syncArticle_()`이 `article_history`의 `record_status=active` 행을 집계하여 자동 재생성.
+> 직접 편집 금지.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `reg_id` | Integer | 규정 ID | FK → regulations.reg_id |
+| `article_no` | String | 조 번호 | |
+| `article_title` | String | 조명(제목) | |
+| `chapter` | String | 장 번호 | |
+| `chapter_title` | String | 장 제목 | |
+| `section` | String | 절 번호 | |
+| `section_title` | String | 절 제목 | |
+| `subsection` | String | 관 번호 | |
+| `subsection_title` | String | 관 제목 | |
+| `paragraph_no` | Integer | 항 번호 | 0 = 본문 |
+| `item_no` | String | 호 번호 | |
+| `subitem_no` | String | 목 번호 | |
+| `content` | String | 조문 내용 | |
+| `version` | Integer | 개정차수 번호 | |
+| `revision_dates` | String | 개정일 목록 | JSON 배열 또는 `<YYYY.MM.DD.>` 형식 |
+| `sort_key` | String | 정렬 키 | |
+| `change_type` | String | 최신 변경 유형 | |
+| `change_date` | String | 최종 변경일 | `YYYY.MM.DD.` 형식 |
+
+---
+
+## 8. `attachments` — 버전별 별표·별지 첨부파일
+
+> 현행(active) 첨부파일 집합.
+> 복합키: `reg_id + change_date + attachment_type + attachment_no`
+> 현재 GAS는 `attachment_type`을 생성하며, 조회/재생성 로직에서는 레거시 오타 `attachement_type`도 호환 처리한다.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `reg_id` | Integer | 규정 ID | FK → regulations.reg_id |
+| `change_date` | String | 개정일 | `YYYY.MM.DD.` 형식 |
+| `attachment_type` | String | 첨부 유형 | `별표` \| `별지` \| `별지서식` |
+| `attachment_no` | Integer | 첨부 번호 | 예: 1, 2, 3 |
+| `attachment_title` | String | 첨부 제목 | 예: "일반행정 직위표" |
+| `note` | String | 부기 주석 | 예: "(2019.03.01. 신설)" |
+| `file_url` | String | Drive 다운로드 URL | |
+
+---
+
+## 8-1. `attachment_history` — 첨부파일 이력 원장
+
+> 게시/취소 시 첨부파일 변경 이력을 기록하는 source of truth 성격의 시트.
+> `rebuildAttachmentsFromHistory_()`가 active 집합을 기준으로 `attachments`를 재생성한다.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `reg_id` | Integer | 규정 ID | FK → regulations.reg_id |
+| `round_id` | String | 게시 차수 ID | 게시/취소 롤백 식별용 |
+| `attachment_type` | String | 첨부 유형 | `별표` \| `별지` \| `별지서식` |
+| `attachment_no` | String | 첨부 번호 | 문자열로 저장될 수 있음 |
+| `attachment_key` | String | 첨부 식별키 | 예: `별표:1` |
+| `title` | String | 첨부 제목 | |
+| `note` | String | 부기 주석 | |
+| `file_url` | String | Drive 다운로드 URL | 삭제 이력은 빈값 허용 |
+| `change_type` | String | 변경 유형 | 신설/개정/삭제/기존 |
+| `change_date` | String | 개정일 | `YYYY.MM.DD.` 형식 |
+| `record_status` | String | 행 상태 | `active` \| `superseded` |
+| `updated_at` | DateTime | 최종 수정일시 | ISO 문자열 |
+
+---
+
+## 8-2. `article_annotation_history` — 조문 주석/부기 이력
+
+> 현재 GAS가 직접 생성하지는 않지만, `getArticleHistory_()` 및 개정일 집계 로직이 읽는 참조 시트다.
+> PDF 빌더/초기 적재 스크립트에서 생성되는 레거시 보조 시트로 본다.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `reg_id` | Integer | 규정 ID | FK → regulations.reg_id |
+| `reg_name` | String | 규정명 | |
+| `article_no` | String | 조 번호 | |
+| `article_title` | String | 조 제목 | |
+| `paragraph_no` | Integer | 항 번호 | |
+| `item_no` | String | 호 번호 | |
+| `subitem_no` | String | 목 번호 | |
+| `sort_key` | String | 정렬 키 | |
+| `change_type` | String | 변경 유형 | |
+| `change_date` | String | 개정일 | |
+| `annotation_scope` | String | 주석 범위 | |
+| `source_date` | String | 주석 원천 일자 | |
+| `note` | String | 주석 내용 | |
+| `updated_at` | DateTime | 최종 수정일시 | |
+
+---
+
+## 9. `category` — 규정 분류
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `category_no` | Integer | 대분류 번호 | PK |
+| `category` | String | 대분류명 | 예: "학사", "재정" |
+| `category_sub_no` | Integer | 소분류 번호 | PK (대분류 내 고유) |
+| `category_sub` | String | 소분류명 | |
+
+---
+
+## 10. `organization` — 직제보직
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `org_id` | String | 직제 고유 ID | PK, 예: `ORG-0001` |
+| `valid_from` | Date | 유효 시작일 | Excel 시리얼 숫자 주의 |
+| `valid_until` | Date | 유효 종료일 | 현행이면 먼 미래 날짜 |
+| `status` | String | 상태 | `active` \| `inactive` |
+| `dept` | String | 부서명 | 예: "AI소프트웨어학부" |
+| `pos` | String | 직위명 | 예: "AI소프트웨어학부장" |
+| `source_file` | String | 출처 파일명 | 예: `4102_직제규정_2024-09-01.pdf` |
+| `current_dept` | String | 현재 부서명 | 부서명 변경 추적용 |
+
+---
+
+## 11. `validation_log` — 검증 로그
+
+> VALIDATING 단계 전환 시 및 drafter_item 제출 시 검증 결과를 기록. `submitDrafterItem_`·`updateAmendmentStatus_` 에서 append.
+> `warn` 항목에 `ignore_reason`이 없으면 서버가 상태 전환을 거절한다.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `log_id` | String | 로그 ID | PK |
+| `item_id` | String | 개정안 ID | FK → amendment_item.item_id |
+| `rule_code` | String | 검증 규칙 코드 | 예: `ART_NO_CONTINUITY`, `CHANGE_TYPE_MISSING` |
+| `severity` | String | 심각도 | `err` \| `warn` |
+| `article_no` | String | 관련 조번호 | |
+| `message` | String | 검증 메시지 | |
+| `ignore_reason` | String | 무시 사유 | 담당자가 경고를 인지하고 무시할 때 |
+| `checked_at` | DateTime | 검증 일시 | |
+| `context` | String | 실행 문맥 | 예: `status-transition` |
+| `workflow_status` | String | 당시 안건 상태 | 예: `VALIDATING` |
+
+---
+
+## 12. `audit_log` — 관리자 작업 감사 로그
+
+> 저장/제출/반려/검토완료/게시/게시취소 이벤트를 기록할 예정. 현재 조회 화면(`audit-log` 라우트)은 stub 상태이며 서버 기록 연결은 미구현.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `audit_id` | String | 로그 ID | PK |
+| `item_id` | String | 개정안 ID | FK → amendment_item.item_id |
+| `action` | String | 작업 유형 | 아래 참조 |
+| `detail` | String | 작업 상세 | |
+| `performed_at` | DateTime | 작업 일시 | |
+| `context` | String | 실행 문맥 | 예: `manual-admin`, `status-transition` |
+| `workflow_status` | String | 당시 안건 상태 | |
+
+**action 코드:**
+
+| 코드 | 설명 |
+|------|------|
+| `STATUS_ADVANCE` | 상태 진행 (다음 단계로) |
+| `STATUS_REVERT` | 상태 복귀 (이전 단계로) |
+| `PUBLISH` | 게시 완료 |
+| `UNPUBLISH` | 게시 취소 |
+| `DRAFT_SAVE` | 초안 저장 |
+| `DRAFT_DELETE` | 초안 삭제 |
+| `AMENDMENT_CREATE` | 개정안 신규 등록 |
+| `AMENDMENT_DELETE` | 개정안 삭제 |
+| `CACHE_CLEAR` | 서버 캐시 초기화 |
+
+---
+
+## 날짜 형식 규칙
+
+| 시트 | 형식 | 예시 |
+|------|------|------|
+| `article_history.change_date` | `YYYY.MM.DD.` | `2026.03.28.` |
+| `history.change_date` | `YYYY.MM.DD.` | `2026.03.28.` |
+| `regulations.enacted_date` | `YYYY.MM.DD.` | `1959.12.24.` |
+| `regulations.updated_at` | `YYYY-MM-DD HH:mm:ss` | `2026-03-18 16:55:25` |
+| `organization.valid_from/until` | Excel 시리얼 숫자 | `45536` = 2024-09-01 |
+| `history.effective_date` | `YYYY.MM.DD.` | `2026.04.01.` |
+
+> `new Date().toISOString()`로 기록되는 컬럼(`created_at`, `updated_at`, `checked_at`, `performed_at`, `confirmed_at`, `published_at`)은 시트에서 ISO 문자열로 보일 수 있다.
+
+> `formatDate()` (Code_web.js)가 한글/대시/점 형식 모두를 `YYYY.MM.DD.`로 정규화.
+
+---
+
+## sessionStorage
+
+| 키 | 설명 |
+|----|------|
+| `adminAuthToken` | `verifyLogin` 성공 시 발급된 세션 토큰 |
+| `adminPw` | 구버전 호환용 토큰 미러 키. 더 이상 평문 비밀번호를 저장하지 않음 |
+| `adminRole` | 서버가 확정한 로그인 역할(`admin`, `drafter`) |
+| `authUsername` | 로그인한 계정 아이디 |
+
+---
+
+## 구 스키마와의 차이 (v1.1 → v2.2)
+
+| 항목 | 구 스키마 | 실제 (v2.0) |
+|------|-----------|-------------|
+| `regulations` 컬럼 | enact_date, category | enacted_date, approval_path, current_version 추가 |
+| `history` 컬럼 | amend_no, revised_date, reason, approver | round_id, version, reg_name, change_type, content, has_digitalfile, pdf_url, effective_date |
+| `article_history` 컬럼 | subsection 없음, round_id 없음 | `ARTICLE_HISTORY_HEADERS` 기준 표준화. version, prev_article_no, moved_to_article_no, change_origin, review_needed, review_note, updated_at 포함 |
+| `article_draft` 컬럼 | amendId, regId (camelCase) | amendment_id, reg_id (snake_case), current_rows 추가 |
+| `attachments` 컬럼 | `attachement_type` 중심 문서화 | `attachment_type`가 현재 표준, 오타 컬럼은 호환만 유지 |
+| `attachment_history` | 미정의 | 게시/취소용 첨부 이력 원장 추가 |
+| `article_annotation_history` | 미정의 | 레거시 참조 시트로 문서화 |
+| `amendment_item` | 미정의 | `effective_date_auto`, `source_drafter_item_id` 포함 |
+| `drafter_item` | 미정의 | `draft_attachments`, `new_reg_name`, `ACCEPTED` 상태 포함 |
+| `validation_log` | 미정의 | `context`, `workflow_status` 포함 |
+| `audit_log` | localStorage만 | `context`, `workflow_status` 포함한 시트형 로그로 전환 |
+| localStorage 섹션 | 대부분 미구현 | 삭제 (amendment/amendment_item으로 대체 예정) |
