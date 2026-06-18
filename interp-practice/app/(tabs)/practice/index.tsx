@@ -10,9 +10,10 @@ import {
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { getDueForReview } from "../../../src/db/progress";
-import { getSentenceById } from "../../../src/db/sentences";
-import { getAllSentences } from "../../../src/db/sentences";
+import { getSentenceById, getAllSentences } from "../../../src/db/sentences";
+import { getHeatmapData, getStats } from "../../../src/db/results";
 import { useSessionStore } from "../../../src/features/session/useSessionStore";
+import { Heatmap } from "../../../src/components/Heatmap";
 import type { SentenceEntry, Direction, SentenceProgress, Category } from "../../../src/types";
 
 const CATEGORIES: { key: Category; label: string }[] = [
@@ -37,6 +38,8 @@ export default function PracticeHome() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<1 | 2 | 3 | null>(null);
   const [dueItems, setDueItems] = useState<Array<{ progress: SentenceProgress; sentence: SentenceEntry | null }>>([]);
   const [allSentences, setAllSentences] = useState<SentenceEntry[]>([]);
+  const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
+  const [stats, setStats] = useState({ streak: 0, totalSentences: 0, todayCount: 0 });
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
@@ -47,12 +50,19 @@ export default function PracticeHome() {
 
   async function loadData() {
     setLoading(true);
-    const [due, sentences] = await Promise.all([getDueForReview(), getAllSentences()]);
+    const [due, sentences, heatmap, statsData] = await Promise.all([
+      getDueForReview(),
+      getAllSentences(),
+      getHeatmapData(84),
+      getStats(),
+    ]);
     const dueWithSentences = await Promise.all(
       due.map(async (p) => ({ progress: p, sentence: await getSentenceById(p.sentenceId) }))
     );
     setDueItems(dueWithSentences.filter((d) => d.sentence !== null));
     setAllSentences(sentences);
+    setHeatmapData(heatmap);
+    setStats(statsData);
     setLoading(false);
   }
 
@@ -78,6 +88,31 @@ export default function PracticeHome() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.statsBar}>
+        <View style={styles.statItem}>
+          <Text style={styles.statEmoji}>🔥</Text>
+          <Text style={styles.statValue}>{stats.streak}</Text>
+          <Text style={styles.statLabel}>연속</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statEmoji}>📚</Text>
+          <Text style={styles.statValue}>{stats.totalSentences}</Text>
+          <Text style={styles.statLabel}>문장</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statEmoji}>✅</Text>
+          <Text style={styles.statValue}>{stats.todayCount}</Text>
+          <Text style={styles.statLabel}>오늘</Text>
+        </View>
+      </View>
+
+      <View style={styles.heatmapSection}>
+        <Text style={styles.heatmapTitle}>최근 12주</Text>
+        <Heatmap data={heatmapData} weeks={12} />
+      </View>
+
       {dueItems.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>오늘의 복습 ({dueItems.length})</Text>
@@ -201,6 +236,36 @@ export default function PracticeHome() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
   content: { padding: 16, gap: 0, paddingBottom: 40 },
+  statsBar: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  statItem: { alignItems: "center", gap: 2 },
+  statEmoji: { fontSize: 18 },
+  statValue: { fontSize: 20, fontWeight: "700", color: "#111827" },
+  statLabel: { fontSize: 11, color: "#6B7280" },
+  statDivider: { width: 1, height: 36, backgroundColor: "#E5E7EB" },
+  heatmapSection: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  heatmapTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 10,
+  },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   section: { marginBottom: 24 },
   sectionTitle: {
