@@ -1,0 +1,102 @@
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
+import { upsertSentence } from "../db/sentences";
+import type { SentenceEntry, Category } from "../types";
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === "," && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
+  const get = (key: string) => cols[headers.indexOf(key)]?.trim() ?? "";
+
+  const id = get("id");
+  const englishText = get("englishText");
+  if (!id || !englishText) return null;
+
+  const tagsRaw = get("tags");
+  const tags = tagsRaw ? tagsRaw.split("|").map((t) => t.trim()) : [];
+
+  const koreanText = get("koreanText") || undefined;
+  const modelKorean = get("modelKorean") || undefined;
+  const modelEnglish = get("modelEnglish") || undefined;
+  const enAudioType = get("englishAudioType") || "tts";
+  const koAudioType = get("koreanAudioType") || "tts";
+
+  const diffRaw = parseInt(get("difficulty"), 10);
+  const difficulty = ([1, 2, 3].includes(diffRaw) ? diffRaw : 1) as 1 | 2 | 3;
+
+  return {
+    id,
+    category: (get("category") as Category) || "daily",
+    difficulty,
+    englishText,
+    koreanText,
+    englishAudio: enAudioType === "file"
+      ? { type: "file", uri: get("englishAudioUri") }
+      : { type: "tts" },
+    koreanAudio: koAudioType === "file"
+      ? { type: "file", uri: get("koreanAudioUri") }
+      : { type: "tts" },
+    modelKorean,
+    modelEnglish,
+    tags,
+  };
+}
+
+export async function importCSV(): Promise<{ imported: number; failed: number }> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: ["text/csv", "text/comma-separated-values", "text/plain"],
+    copyToCacheDirectory: true,
+  });
+
+  if (result.canceled || !result.assets?.[0]) {
+    return { imported: 0, failed: 0 };
+  }
+
+  const content = await FileSystem.readAsStringAsync(result.assets[0].uri);
+  const lines = content.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return { imported: 0, failed: 0 };
+
+  const headers = parseCSVLine(lines[0]);
+  let imported = 0;
+  let failed = 0;
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    const entry = rowToEntry(cols, headers);
+    if (entry) {
+      try {
+        await upsertSentence(entry);
+        imported++;
+      } catch {
+        failed++;
+      }
+    } else {
+      failed++;
+    }
+  }
+
+  return { imported, failed };
+}
