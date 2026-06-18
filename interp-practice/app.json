@@ -23,8 +23,19 @@
       "bundler": "metro",
       "favicon": "./assets/favicon.png"
     },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "requestHeaders": {},
+      "url": "https://u.expo.dev/placeholder"
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "plugins": [
       "expo-router",
+      "expo-updates",
       "expo-audio",
       [
         "expo-speech-recognition",
