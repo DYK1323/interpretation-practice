@@ -1,6 +1,6 @@
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
-import { upsertSentence } from "../db/sentences";
+import { getDB } from "../db/schema";
 import type { SentenceEntry, Category } from "../types";
 
 function parseCSVLine(line: string): string[] {
@@ -84,25 +84,57 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
   if (lines.length < 2) return { imported: 0, failed: 0 };
 
   const headers = parseCSVLine(lines[0]);
-  let imported = 0;
+  const keepDifficulty = !headers.includes("difficulty");
+
+  const entries: SentenceEntry[] = [];
   let failed = 0;
 
   for (let i = 1; i < lines.length; i++) {
     const cols = parseCSVLine(lines[i]);
     const entry = rowToEntry(cols, headers);
-    if (entry) {
-      try {
-        await upsertSentence(entry, { keepDifficulty: !headers.includes("difficulty") });
-        imported++;
-      } catch {
-        failed++;
-      }
-    } else {
-      failed++;
-    }
+    if (entry) entries.push(entry);
+    else failed++;
   }
 
-  return { imported, failed };
+  const db = await getDB();
+  await db.withTransactionAsync(async () => {
+    for (const e of entries) {
+      const diffParam = keepDifficulty ? null : e.difficulty;
+      await db.runAsync(
+        `INSERT INTO sentences (
+          id, category, difficulty, english_text, korean_text,
+          english_audio_type, english_audio_uri,
+          korean_audio_type, korean_audio_uri,
+          model_korean, model_english, tags, duration_seconds, notes
+        ) VALUES (?, ?, COALESCE(?, 2), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          category = excluded.category,
+          difficulty = COALESCE(excluded.difficulty, sentences.difficulty),
+          english_text = excluded.english_text,
+          korean_text = excluded.korean_text,
+          english_audio_type = excluded.english_audio_type,
+          english_audio_uri = excluded.english_audio_uri,
+          korean_audio_type = excluded.korean_audio_type,
+          korean_audio_uri = excluded.korean_audio_uri,
+          model_korean = excluded.model_korean,
+          model_english = excluded.model_english,
+          tags = excluded.tags,
+          duration_seconds = excluded.duration_seconds,
+          notes = excluded.notes`,
+        [
+          e.id, e.category, diffParam, e.englishText, e.koreanText ?? null,
+          e.englishAudio?.type ?? "tts",
+          e.englishAudio?.type === "file" ? e.englishAudio.uri : null,
+          e.koreanAudio?.type ?? "tts",
+          e.koreanAudio?.type === "file" ? e.koreanAudio.uri : null,
+          e.modelKorean ?? null, e.modelEnglish ?? null,
+          JSON.stringify(e.tags), e.durationSeconds ?? null, e.notes ?? null,
+        ]
+      );
+    }
+  });
+
+  return { imported: entries.length, failed };
 }
 
 export async function importCSV(): Promise<{ imported: number; failed: number }> {
