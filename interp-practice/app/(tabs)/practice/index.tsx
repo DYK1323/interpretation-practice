@@ -218,6 +218,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
     gap: 20,
+    marginBottom: 16,
   },
   queueTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
   queueSummary: {
