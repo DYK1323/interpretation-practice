@@ -23,17 +23,10 @@ import { useSTT } from "../../../src/features/session/useSTT";
 import { getNextStep, STEP_DESCRIPTIONS } from "../../../src/features/session/sessionMachine";
 import { saveResult } from "../../../src/db/results";
 import { scheduleReview } from "../../../src/db/progress";
+import { updateSentenceDifficulty } from "../../../src/db/sentences";
 import { getSetting } from "../../../src/db/settings";
-import type { SessionStep, ReviewInterval } from "../../../src/types";
-import { REVIEW_INTERVALS } from "../../../src/types";
-
-const INTERVAL_LABELS: Record<ReviewInterval, string> = {
-  1: "내일",
-  3: "3일",
-  7: "1주",
-  14: "2주",
-  30: "한 달",
-};
+import type { SessionStep } from "../../../src/types";
+import { DIFFICULTY_OPTIONS } from "../../../src/types";
 
 export default function SessionScreen() {
   const router = useRouter();
@@ -103,7 +96,7 @@ export default function SessionScreen() {
     advance();
   }
 
-  async function handleScheduleReview(intervalDays: ReviewInterval) {
+  async function handleScheduleReview(days: number, difficulty: 1 | 2 | 3) {
     if (sessionSaved) return;
     setSessionSaved(true);
 
@@ -119,7 +112,8 @@ export default function SessionScreen() {
     };
 
     await saveResult(result);
-    await scheduleReview(s.id, direction, intervalDays);
+    await scheduleReview(s.id, direction, days);
+    await updateSentenceDifficulty(s.id, difficulty);
     router.replace("/practice");
   }
 
@@ -238,16 +232,22 @@ export default function SessionScreen() {
             </View>
 
             <View style={styles.reviewSection}>
-              <Text style={styles.reviewLabel}>다음에 다시 볼까요?</Text>
-              <View style={styles.intervalRow}>
-                {REVIEW_INTERVALS.map((days) => (
+              <Text style={styles.reviewLabel}>이 문장 얼마나 어려웠나요?</Text>
+              <View style={styles.difficultyRow}>
+                {DIFFICULTY_OPTIONS.map(({ difficulty, label, days, sublabel }) => (
                   <TouchableOpacity
-                    key={days}
-                    style={styles.intervalBtn}
-                    onPress={() => handleScheduleReview(days)}
+                    key={difficulty}
+                    style={[
+                      styles.difficultyBtn,
+                      difficulty === 3 && styles.diffHard,
+                      difficulty === 2 && styles.diffMed,
+                      difficulty === 1 && styles.diffEasy,
+                    ]}
+                    onPress={() => handleScheduleReview(days, difficulty)}
                     disabled={sessionSaved}
                   >
-                    <Text style={styles.intervalBtnText}>{INTERVAL_LABELS[days]}</Text>
+                    <Text style={styles.difficultyStars}>{label}</Text>
+                    <Text style={styles.difficultySublabel}>{sublabel}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -355,21 +355,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: "center",
   },
-  intervalRow: {
+  difficultyRow: {
     flexDirection: "row",
-    justifyContent: "center",
-    flexWrap: "wrap",
     gap: 8,
   },
-  intervalBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: "#EBF2FF",
+  difficultyBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    alignItems: "center",
+    gap: 4,
     borderWidth: 1,
-    borderColor: "#BFDBFE",
   },
-  intervalBtnText: { fontSize: 14, fontWeight: "600", color: "#1A56DB" },
+  diffHard: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
+  diffMed:  { backgroundColor: "#FFFBEB", borderColor: "#FDE68A" },
+  diffEasy: { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" },
+  difficultyStars: { fontSize: 13, fontWeight: "700", color: "#374151" },
+  difficultySublabel: { fontSize: 11, color: "#6B7280" },
   actionRow: {
     flexDirection: "row",
     gap: 12,

@@ -18,6 +18,7 @@ export interface SentenceEntry {
   modelEnglish?: string;
   tags: string[];
   durationSeconds?: number;
+  notes?: string;
 }
 
 export interface SentenceProgress {
@@ -65,5 +66,9 @@ export const SESSION_STEPS: SessionStep[] = [
   "COMPARE",
 ];
 
-export const REVIEW_INTERVALS = [1, 3, 7, 14, 30] as const;
-export type ReviewInterval = (typeof REVIEW_INTERVALS)[number];
+// 난이도 = 복습 간격: 어려움(1일) / 보통(3일) / 쉬움(1주)
+export const DIFFICULTY_OPTIONS = [
+  { difficulty: 3 as const, label: "★★★ 어려움", days: 1, sublabel: "내일 복습" },
+  { difficulty: 2 as const, label: "★★☆ 보통",   days: 3, sublabel: "3일 후" },
+  { difficulty: 1 as const, label: "★☆☆ 쉬움",   days: 7, sublabel: "1주 후" },
+];

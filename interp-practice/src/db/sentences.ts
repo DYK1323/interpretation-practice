@@ -22,6 +22,7 @@ function rowToEntry(row: any): SentenceEntry {
     modelEnglish: row.model_english ?? undefined,
     tags: JSON.parse(row.tags ?? "[]"),
     durationSeconds: row.duration_seconds ?? undefined,
+    notes: row.notes ?? undefined,
   };
 }
 
@@ -66,8 +67,8 @@ export async function upsertSentence(entry: SentenceEntry): Promise<void> {
       id, category, difficulty, english_text, korean_text,
       english_audio_type, english_audio_uri,
       korean_audio_type, korean_audio_uri,
-      model_korean, model_english, tags, duration_seconds
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      model_korean, model_english, tags, duration_seconds, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       category = excluded.category,
       difficulty = excluded.difficulty,
@@ -80,7 +81,8 @@ export async function upsertSentence(entry: SentenceEntry): Promise<void> {
       model_korean = excluded.model_korean,
       model_english = excluded.model_english,
       tags = excluded.tags,
-      duration_seconds = excluded.duration_seconds`,
+      duration_seconds = excluded.duration_seconds,
+      notes = excluded.notes`,
     [
       entry.id,
       entry.category,
@@ -95,8 +97,14 @@ export async function upsertSentence(entry: SentenceEntry): Promise<void> {
       entry.modelEnglish ?? null,
       JSON.stringify(entry.tags),
       entry.durationSeconds ?? null,
+      entry.notes ?? null,
     ]
   );
+}
+
+export async function updateSentenceDifficulty(id: string, difficulty: 1 | 2 | 3): Promise<void> {
+  const db = await getDB();
+  await db.runAsync("UPDATE sentences SET difficulty = ? WHERE id = ?", [difficulty, id]);
 }
 
 export async function updateSentenceAudio(

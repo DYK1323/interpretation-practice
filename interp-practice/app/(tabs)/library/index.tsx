@@ -92,8 +92,14 @@ export default function LibraryIndex() {
             {importing ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={styles.importBtnText}>+ CSV 가져오기</Text>
+              <Text style={styles.importBtnText}>CSV 가져오기</Text>
             )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => router.push("/library/new")}
+          >
+            <Text style={styles.addBtnText}>+ 추가</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -145,6 +151,11 @@ export default function LibraryIndex() {
                   {item.koreanText}
                 </Text>
               )}
+              {item.notes && (
+                <Text style={styles.notesPreview} numberOfLines={1}>
+                  📝 {item.notes}
+                </Text>
+              )}
             </TouchableOpacity>
           )}
         />
@@ -185,6 +196,14 @@ const styles = StyleSheet.create({
   },
   importBtnDisabled: { opacity: 0.6 },
   importBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
+  addBtn: {
+    backgroundColor: "#059669",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  addBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   empty: {
     flex: 1,
@@ -238,4 +257,5 @@ const styles = StyleSheet.create({
   diffText: { fontSize: 12, color: "#F59E0B" },
   enText: { fontSize: 15, color: "#111827", lineHeight: 22 },
   koText: { fontSize: 14, color: "#6B7280", lineHeight: 20 },
+  notesPreview: { fontSize: 12, color: "#92400E", lineHeight: 18 },
 });

@@ -11,13 +11,13 @@ export async function getDB(): Promise<SQLite.SQLiteDatabase> {
 
 export async function initDB(): Promise<void> {
   const database = await getDB();
-  await database.execAsync(`
-    PRAGMA journal_mode = WAL;
+  await database.execAsync(`PRAGMA journal_mode = WAL;`);
 
+  await database.execAsync(`
     CREATE TABLE IF NOT EXISTS sentences (
       id TEXT PRIMARY KEY,
       category TEXT NOT NULL,
-      difficulty INTEGER NOT NULL,
+      difficulty INTEGER NOT NULL DEFAULT 1,
       english_text TEXT NOT NULL,
       korean_text TEXT,
       english_audio_type TEXT DEFAULT 'tts',
@@ -27,7 +27,8 @@ export async function initDB(): Promise<void> {
       model_korean TEXT,
       model_english TEXT,
       tags TEXT DEFAULT '[]',
-      duration_seconds REAL
+      duration_seconds REAL,
+      notes TEXT
     );
 
     CREATE TABLE IF NOT EXISTS sentence_progress (
@@ -56,4 +57,16 @@ export async function initDB(): Promise<void> {
       value TEXT NOT NULL
     );
   `);
+
+  // Migration v2: add notes column to sentences (existing installs)
+  const versionRow = await database.getFirstAsync<{ user_version: number }>(`PRAGMA user_version`);
+  const version = versionRow?.user_version ?? 0;
+  if (version < 2) {
+    try {
+      await database.execAsync(`ALTER TABLE sentences ADD COLUMN notes TEXT`);
+    } catch {
+      // Fresh install already has the column from CREATE TABLE above
+    }
+    await database.execAsync(`PRAGMA user_version = 2`);
+  }
 }
