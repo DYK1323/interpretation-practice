@@ -82,7 +82,7 @@ export default function LibraryIndex() {
         <Text style={styles.count}>{sentences.length}개 문장</Text>
         <View style={styles.toolbarButtons}>
           <TouchableOpacity style={styles.templateBtn} onPress={handleDownloadTemplate}>
-            <Text style={styles.templateBtnText}>양식 ↓</Text>
+            <Text style={styles.templateBtnText}>양식 공유</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.importBtn, importing && styles.importBtnDisabled]}

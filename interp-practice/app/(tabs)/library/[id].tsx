@@ -135,7 +135,7 @@ export default function SentenceDetail() {
         options={{
           headerShown: true,
           title: isNew ? "새 문장 추가" : "문장 편집",
-          headerBackTitle: "목록",
+          headerBackTitle: "닫기",
         }}
       />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
