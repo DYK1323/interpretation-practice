@@ -34,14 +34,16 @@ export async function exportCSV(): Promise<number> {
   const sentences = await getAllSentences();
   const csv = [HEADERS, ...sentences.map(entryToRow)].join("\n");
 
-  const file = new File(Paths.cache, "sentences_export.csv");
+  const file = new File(Paths.document, "sentences_export.csv");
+  if (file.exists) file.delete();
   file.write(csv);
+
+  if (!file.exists) throw new Error("파일 생성에 실패했습니다.");
 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(file.uri, {
-      mimeType: "text/csv",
+      mimeType: "text/plain",
       dialogTitle: "문장 CSV 내보내기",
-      UTI: "public.comma-separated-values-text",
     });
   }
 
