@@ -7,21 +7,15 @@ import {
   FlatList,
   Alert,
   ActivityIndicator,
-  ToastAndroid,
-  Platform,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { File, Paths } from "expo-file-system";
-import * as Sharing from "expo-sharing";
 import { getAllSentences, deleteSentence } from "../../../src/db/sentences";
-import { importCSV } from "../../../src/utils/csvImport";
 import type { SentenceEntry } from "../../../src/types";
 
 export default function LibraryIndex() {
   const router = useRouter();
   const [sentences, setSentences] = useState<SentenceEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -34,42 +28,6 @@ export default function LibraryIndex() {
     const data = await getAllSentences();
     setSentences(data);
     setLoading(false);
-  }
-
-  async function handleDownloadTemplate() {
-    const template = [
-      "id,category,difficulty,englishText,koreanText,modelKorean,modelEnglish,tags",
-      'news_001,news,2,"The talks collapsed without agreement.","협상이 합의 없이 결렬됐다.","협상이 합의 없이 결렬됐습니다.","The talks ended without reaching an agreement.",idiom',
-      'daily_001,daily,1,"How was your day?","오늘 어땠어?","오늘 하루 어떠셨나요?","How was your day?",',
-    ].join("\n");
-
-    const file = new File(Paths.cache, "template.csv");
-    file.write(template);
-    await Sharing.shareAsync(file.uri, { mimeType: "text/csv", dialogTitle: "CSV 양식 저장" });
-    if (Platform.OS === "android") ToastAndroid.show("공유 완료", ToastAndroid.SHORT);
-  }
-
-  async function handleImport() {
-    setImporting(true);
-    try {
-      const { imported, failed } = await importCSV();
-      await load();
-      if (Platform.OS === "android") {
-        ToastAndroid.show(
-          `${imported}개 문장 가져오기 완료${failed > 0 ? ` (${failed}개 실패)` : ""}`,
-          ToastAndroid.LONG
-        );
-      } else {
-        Alert.alert(
-          "가져오기 완료",
-          `${imported}개 문장을 가져왔습니다.${failed > 0 ? ` (${failed}개 실패)` : ""}`
-        );
-      }
-    } catch (e) {
-      Alert.alert("오류", "CSV 파일을 처리하는 중 오류가 발생했습니다.");
-    } finally {
-      setImporting(false);
-    }
   }
 
   function handleDelete(id: string) {
@@ -90,28 +48,12 @@ export default function LibraryIndex() {
     <View style={styles.container}>
       <View style={styles.toolbar}>
         <Text style={styles.count}>{sentences.length}개 문장</Text>
-        <View style={styles.toolbarButtons}>
-          <TouchableOpacity style={styles.templateBtn} onPress={handleDownloadTemplate}>
-            <Text style={styles.templateBtnText}>양식 공유</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.importBtn, importing && styles.importBtnDisabled]}
-            onPress={handleImport}
-            disabled={importing}
-          >
-            {importing ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.importBtnText}>CSV 가져오기</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => router.push("/library-edit/new")}
-          >
-            <Text style={styles.addBtnText}>+ 추가</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => router.push("/library-edit/new")}
+        >
+          <Text style={styles.addBtnText}>+ 추가</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -123,12 +65,7 @@ export default function LibraryIndex() {
           <Text style={styles.emptyIcon}>📂</Text>
           <Text style={styles.emptyTitle}>문장이 없습니다</Text>
           <Text style={styles.emptyDesc}>
-            CSV 파일로 문장을 가져오거나{"\n"}직접 추가해보세요.
-          </Text>
-          <Text style={styles.csvFormat}>
-            CSV 컬럼 순서:{"\n"}
-            id, category, difficulty, englishText, koreanText,{"\n"}
-            englishAudioType, koreanAudioType, modelKorean, modelEnglish, tags
+            설정에서 구글 시트를 동기화하거나{"\n"}직접 추가해보세요.
           </Text>
         </View>
       ) : (
@@ -187,25 +124,6 @@ const styles = StyleSheet.create({
     borderBottomColor: "#E5E7EB",
   },
   count: { fontSize: 14, color: "#6B7280", fontWeight: "500" },
-  toolbarButtons: { flexDirection: "row", gap: 8 },
-  templateBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#1A56DB",
-  },
-  templateBtnText: { color: "#1A56DB", fontSize: 13, fontWeight: "600" },
-  importBtn: {
-    backgroundColor: "#1A56DB",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    minWidth: 120,
-    alignItems: "center",
-  },
-  importBtnDisabled: { opacity: 0.6 },
-  importBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
   addBtn: {
     backgroundColor: "#059669",
     paddingVertical: 8,
@@ -225,16 +143,6 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 48 },
   emptyTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
   emptyDesc: { fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 22 },
-  csvFormat: {
-    fontSize: 11,
-    color: "#9CA3AF",
-    textAlign: "center",
-    lineHeight: 18,
-    backgroundColor: "#F3F4F6",
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-  },
   list: { padding: 16, gap: 10 },
   card: {
     backgroundColor: "#FFFFFF",
