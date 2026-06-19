@@ -172,12 +172,14 @@ export default function SessionScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleExit} style={styles.exitBtn}>
-          <Text style={styles.exitText}>✕</Text>
-        </TouchableOpacity>
-        {queue.length > 1 && (
-          <Text style={styles.queueCounter}>{queueIndex + 1} / {queue.length}</Text>
-        )}
+        <View style={styles.gnb}>
+          <TouchableOpacity onPress={handleExit} style={styles.exitBtn}>
+            <Text style={styles.exitText}>나가기</Text>
+          </TouchableOpacity>
+          {queue.length > 1 && (
+            <Text style={styles.queueCounter}>{queueIndex + 1} / {queue.length}</Text>
+          )}
+        </View>
         <StepIndicator currentStep={step} />
       </View>
 
@@ -293,10 +295,17 @@ export default function SessionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: { borderBottomWidth: 1, borderBottomColor: "#F3F4F6", paddingTop: 8 },
-  exitBtn: { position: "absolute", top: 12, right: 16, zIndex: 10, padding: 4 },
-  exitText: { fontSize: 18, color: "#9CA3AF" },
-  queueCounter: { position: "absolute", top: 14, left: 16, fontSize: 13, fontWeight: "600", color: "#6B7280" },
+  header: { borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
+  gnb: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    height: 44,
+  },
+  exitBtn: { padding: 4 },
+  exitText: { fontSize: 15, fontWeight: "500", color: "#6B7280" },
+  queueCounter: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
   body: { flex: 1 },
   bodyContent: { flexGrow: 1, padding: 24 },
   stepContent: { flex: 1, alignItems: "center", gap: 20, paddingTop: 24 },
