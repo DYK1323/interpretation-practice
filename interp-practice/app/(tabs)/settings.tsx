@@ -17,6 +17,7 @@ import {
 import { getAllSettings, setSetting, getStringSetting, setStringSetting } from "../../src/db/settings";
 import { syncFromSheetUrl } from "../../src/utils/csvImport";
 import { exportCSV } from "../../src/utils/csvExport";
+import { exportProgressBackup, importProgressBackup } from "../../src/utils/progressBackup";
 import type { UserSettings } from "../../src/types";
 import { DEFAULT_SETTINGS } from "../../src/types";
 
@@ -33,6 +34,8 @@ export default function SettingsScreen() {
   const [sheetUrl, setSheetUrl] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingProgress, setExportingProgress] = useState(false);
+  const [importingProgress, setImportingProgress] = useState(false);
   const [limitModalVisible, setLimitModalVisible] = useState(false);
   const [limitInput, setLimitInput] = useState("");
   const limitInputRef = useRef<TextInput>(null);
@@ -82,6 +85,39 @@ export default function SettingsScreen() {
       Alert.alert("동기화 실패", e?.message ?? "알 수 없는 오류");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleExportProgress() {
+    setExportingProgress(true);
+    try {
+      const count = await exportProgressBackup();
+      if (Platform.OS === "android") {
+        ToastAndroid.show(`${count}개 진도 백업 완료`, ToastAndroid.SHORT);
+      }
+    } catch (e: any) {
+      Alert.alert("백업 실패", e?.message ?? "알 수 없는 오류");
+    } finally {
+      setExportingProgress(false);
+    }
+  }
+
+  async function handleImportProgress() {
+    setImportingProgress(true);
+    try {
+      const { imported, failed } = await importProgressBackup();
+      if (imported === 0 && failed === 0) {
+        // user cancelled picker
+      } else {
+        Alert.alert(
+          "복원 완료",
+          `${imported}개 복원됨${failed > 0 ? `, ${failed}개 실패` : ""}`
+        );
+      }
+    } catch (e: any) {
+      Alert.alert("복원 실패", e?.message ?? "알 수 없는 오류");
+    } finally {
+      setImportingProgress(false);
     }
   }
 
@@ -149,6 +185,35 @@ export default function SettingsScreen() {
           }
         </TouchableOpacity>
         <Text style={styles.hint}>공유 창에서 구글 드라이브를 선택하세요</Text>
+      </View>
+
+      {/* 학습 진도 백업 */}
+      <View style={styles.group}>
+        <Text style={styles.groupTitle}>학습 진도 백업</Text>
+        <Text style={styles.desc}>
+          복습 일정과 학습 횟수를 CSV로 백업합니다. 폰을 바꿔도 진도를 이어갈 수 있습니다.
+        </Text>
+        <TouchableOpacity
+          style={[styles.actionBtn, exportingProgress && styles.actionBtnDisabled]}
+          onPress={handleExportProgress}
+          disabled={exportingProgress}
+        >
+          {exportingProgress
+            ? <ActivityIndicator size="small" color="#FFFFFF" />
+            : <Text style={styles.actionBtnText}>진도 백업 내보내기</Text>
+          }
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnSecondary, importingProgress && styles.actionBtnDisabled]}
+          onPress={handleImportProgress}
+          disabled={importingProgress}
+        >
+          {importingProgress
+            ? <ActivityIndicator size="small" color="#1A56DB" />
+            : <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>진도 백업 복원하기</Text>
+          }
+        </TouchableOpacity>
+        <Text style={styles.hint}>복원 시 기존 진도에 덮어씌워집니다</Text>
       </View>
 
       {/* 연습 설정 */}
