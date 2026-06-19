@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { getAllSentences, deleteSentence } from "../../../src/db/sentences";
 import { importCSV } from "../../../src/utils/csvImport";
 import type { SentenceEntry } from "../../../src/types";
@@ -30,6 +32,18 @@ export default function LibraryIndex() {
     const data = await getAllSentences();
     setSentences(data);
     setLoading(false);
+  }
+
+  async function handleDownloadTemplate() {
+    const template = [
+      "id,category,difficulty,englishText,koreanText,modelKorean,modelEnglish,tags",
+      'news_001,news,2,"The talks collapsed without agreement.","협상이 합의 없이 결렬됐다.","협상이 합의 없이 결렬됐습니다.","The talks ended without reaching an agreement.",idiom',
+      'daily_001,daily,1,"How was your day?","오늘 어땠어?","오늘 하루 어떠셨나요?","How was your day?",',
+    ].join("\n");
+
+    const file = new File(Paths.cache, "template.csv");
+    file.write(template);
+    await Sharing.shareAsync(file.uri, { mimeType: "text/csv", dialogTitle: "CSV 양식 저장" });
   }
 
   async function handleImport() {
@@ -66,17 +80,22 @@ export default function LibraryIndex() {
     <View style={styles.container}>
       <View style={styles.toolbar}>
         <Text style={styles.count}>{sentences.length}개 문장</Text>
-        <TouchableOpacity
-          style={[styles.importBtn, importing && styles.importBtnDisabled]}
-          onPress={handleImport}
-          disabled={importing}
-        >
-          {importing ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.importBtnText}>+ CSV 가져오기</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.toolbarButtons}>
+          <TouchableOpacity style={styles.templateBtn} onPress={handleDownloadTemplate}>
+            <Text style={styles.templateBtnText}>양식 ↓</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.importBtn, importing && styles.importBtnDisabled]}
+            onPress={handleImport}
+            disabled={importing}
+          >
+            {importing ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.importBtnText}>+ CSV 가져오기</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -147,6 +166,15 @@ const styles = StyleSheet.create({
     borderBottomColor: "#E5E7EB",
   },
   count: { fontSize: 14, color: "#6B7280", fontWeight: "500" },
+  toolbarButtons: { flexDirection: "row", gap: 8 },
+  templateBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#1A56DB",
+  },
+  templateBtnText: { color: "#1A56DB", fontSize: 13, fontWeight: "600" },
   importBtn: {
     backgroundColor: "#1A56DB",
     paddingVertical: 8,
