@@ -102,8 +102,14 @@ export default function HistoryScreen() {
                 <View style={styles.divider} />
                 {result.interpRecordingUri ? (
                   <>
-                    <Text style={styles.expandLabel}>내 통역 녹음</Text>
+                    <Text style={styles.expandLabel}>통역 녹음</Text>
                     <AudioPlayer source={{ type: "file", uri: result.interpRecordingUri }} />
+                  </>
+                ) : null}
+                {result.backInterpRecordingUri ? (
+                  <>
+                    <Text style={styles.expandLabel}>재통역 녹음</Text>
+                    <AudioPlayer source={{ type: "file", uri: result.backInterpRecordingUri }} />
                   </>
                 ) : null}
                 <Text style={styles.expandLabel}>내 재통역</Text>

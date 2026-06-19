@@ -54,10 +54,14 @@ async function _runInit(): Promise<void> {
     );
   `);
 
-  // Migration: add notes column if it doesn't exist yet
-  const cols = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(sentences)`);
-  if (!cols.some(c => c.name === "notes")) {
+  const sentenceCols = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(sentences)`);
+  if (!sentenceCols.some(c => c.name === "notes")) {
     await database.execAsync(`ALTER TABLE sentences ADD COLUMN notes TEXT`);
+  }
+
+  const resultCols = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(session_results)`);
+  if (!resultCols.some(c => c.name === "back_interp_recording_uri")) {
+    await database.execAsync(`ALTER TABLE session_results ADD COLUMN back_interp_recording_uri TEXT`);
   }
 }
 

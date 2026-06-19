@@ -30,8 +30,8 @@ import { DIFFICULTY_OPTIONS } from "../../../src/types";
 
 export default function SessionScreen() {
   const router = useRouter();
-  const { sentence, direction, step, interpRecordingUri, backInterpText,
-    queue, queueIndex, setStep, setInterpRecordingUri, setBackInterpText,
+  const { sentence, direction, step, interpRecordingUri, backInterpRecordingUri, backInterpText,
+    queue, queueIndex, setStep, setInterpRecordingUri, setBackInterpRecordingUri, setBackInterpText,
     advanceQueue, reset } = useSessionStore();
 
   // STT auto-advances to COMPARE when recognition ends
@@ -108,6 +108,15 @@ export default function SessionScreen() {
     if (next) setStep(next);
   }
 
+  function handleBackStart() {
+    startListening();
+  }
+
+  function handleBackComplete(uri: string) {
+    setBackInterpRecordingUri(uri);
+    stopListening(); // triggers STT onEnd → setBackInterpText + advance
+  }
+
   async function handleScheduleReview(days: number, difficulty: 1 | 2 | 3) {
     if (sessionSaved) return;
     setSessionSaved(true);
@@ -117,6 +126,7 @@ export default function SessionScreen() {
       direction,
       timestamp: Date.now(),
       interpRecordingUri: interpRecordingUri ?? undefined,
+      backInterpRecordingUri: backInterpRecordingUri ?? undefined,
       backInterpText,
       originalText: sourceText,
       notes: notes.trim() || undefined,
@@ -137,6 +147,7 @@ export default function SessionScreen() {
   function handleRetry() {
     setStep("LISTEN_RECORD");
     setInterpRecordingUri("");
+    setBackInterpRecordingUri("");
     setBackInterpText("");
     setNotes("");
     setSessionSaved(false);
@@ -194,42 +205,42 @@ export default function SessionScreen() {
           </View>
         )}
 
-        {/* Step 2: 내 통역 듣기 + STT로 재통역 */}
+        {/* Step 2: 내 통역 듣기 + 재통역 녹음(RecordButton) + STT */}
         {step === "PLAYBACK_BACK" && interpRecordingUri && (
           <View style={styles.stepContent}>
             <Text style={styles.stepDesc}>{stepDesc}</Text>
             <AudioPlayer source={{ type: "file", uri: interpRecordingUri }} />
             <View style={styles.divider} />
-            <Text style={styles.subLabel}>준비되면 재통역을 말하세요</Text>
-            {transcript ? (
+            <Text style={styles.subLabel}>준비되면 재통역을 녹음하세요</Text>
+            {isListening && transcript ? (
               <View style={styles.liveTranscript}>
                 <Text style={styles.liveTranscriptText}>{transcript}</Text>
               </View>
             ) : null}
-            <View style={styles.sttBtnContainer}>
-              <Animated.View style={{ transform: [{ scale: sttPulse }] }}>
-                <TouchableOpacity
-                  style={[styles.sttBtn, isListening && styles.sttBtnActive]}
-                  onPress={isListening ? stopListening : startListening}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.sttBtnIcon}>{isListening ? "■" : "●"}</Text>
-                </TouchableOpacity>
-              </Animated.View>
-              <Text style={styles.sttBtnLabel}>
-                {isListening ? "탭하여 완료" : "탭하여 말하기"}
-              </Text>
-            </View>
+            <RecordButton
+              onRecordingStart={handleBackStart}
+              onRecordingComplete={handleBackComplete}
+            />
           </View>
         )}
 
         {/* Step 3: 비교 */}
         {step === "COMPARE" && (
           <View style={styles.compareContainer}>
-            {interpRecordingUri ? (
+            {(interpRecordingUri || backInterpRecordingUri) ? (
               <View style={styles.replaySection}>
-                <Text style={styles.replaySectionLabel}>내 통역 다시 듣기</Text>
-                <AudioPlayer source={{ type: "file", uri: interpRecordingUri }} />
+                {interpRecordingUri ? (
+                  <>
+                    <Text style={styles.replaySectionLabel}>통역 녹음</Text>
+                    <AudioPlayer source={{ type: "file", uri: interpRecordingUri }} />
+                  </>
+                ) : null}
+                {backInterpRecordingUri ? (
+                  <>
+                    <Text style={[styles.replaySectionLabel, { marginTop: 10 }]}>재통역 녹음</Text>
+                    <AudioPlayer source={{ type: "file", uri: backInterpRecordingUri }} />
+                  </>
+                ) : null}
               </View>
             ) : null}
             <CompareView
@@ -296,23 +307,6 @@ const styles = StyleSheet.create({
   subLabel: { fontSize: 13, color: "#9CA3AF" },
   liveTranscript: { backgroundColor: "#F0F9FF", borderRadius: 12, padding: 16, width: "100%", borderWidth: 1, borderColor: "#BAE6FD" },
   liveTranscriptText: { fontSize: 15, color: "#0369A1", lineHeight: 22 },
-  sttBtnContainer: { alignItems: "center", gap: 12 },
-  sttBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#1A56DB",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#1A56DB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  sttBtnActive: { backgroundColor: "#EF4444", shadowColor: "#EF4444" },
-  sttBtnIcon: { fontSize: 28, color: "#FFFFFF" },
-  sttBtnLabel: { fontSize: 14, color: "#6B7280" },
   compareContainer: { flex: 1, gap: 0 },
   replaySection: { marginBottom: 16 },
   replaySectionLabel: { fontSize: 13, fontWeight: "600", color: "#6B7280", marginBottom: 8 },

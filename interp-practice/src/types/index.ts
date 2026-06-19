@@ -36,6 +36,7 @@ export interface SessionResult {
   direction: Direction;
   timestamp: number;
   interpRecordingUri?: string;
+  backInterpRecordingUri?: string;
   backInterpText: string;
   originalText: string;
   notes?: string;

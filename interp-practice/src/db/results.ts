@@ -9,6 +9,7 @@ function rowToResult(row: any): SessionResult {
     direction: row.direction as Direction,
     timestamp: row.timestamp,
     interpRecordingUri: row.interp_recording_uri ?? undefined,
+    backInterpRecordingUri: row.back_interp_recording_uri ?? undefined,
     backInterpText: row.back_interp_text ?? "",
     originalText: row.original_text,
     notes: row.notes ?? undefined,
@@ -17,19 +18,26 @@ function rowToResult(row: any): SessionResult {
 
 async function pruneOldRecordings(sentenceId: string, direction: Direction, keepCount = 2) {
   const db = await getDB();
-  const rows = await db.getAllAsync<{ id: string; interp_recording_uri: string }>(
-    `SELECT id, interp_recording_uri FROM session_results
-     WHERE sentence_id = ? AND direction = ? AND interp_recording_uri IS NOT NULL
+  const rows = await db.getAllAsync<{
+    id: string;
+    interp_recording_uri: string | null;
+    back_interp_recording_uri: string | null;
+  }>(
+    `SELECT id, interp_recording_uri, back_interp_recording_uri FROM session_results
+     WHERE sentence_id = ? AND direction = ?
      ORDER BY timestamp DESC`,
     [sentenceId, direction]
   );
   for (const row of rows.slice(keepCount)) {
-    try {
-      const file = new File(row.interp_recording_uri);
-      if (file.exists) file.delete();
-    } catch {}
+    for (const uri of [row.interp_recording_uri, row.back_interp_recording_uri]) {
+      if (!uri) continue;
+      try {
+        const file = new File(uri);
+        if (file.exists) file.delete();
+      } catch {}
+    }
     await db.runAsync(
-      "UPDATE session_results SET interp_recording_uri = NULL WHERE id = ?",
+      "UPDATE session_results SET interp_recording_uri = NULL, back_interp_recording_uri = NULL WHERE id = ?",
       [row.id]
     );
   }
@@ -39,14 +47,15 @@ export async function saveResult(result: SessionResult): Promise<void> {
   const db = await getDB();
   await db.runAsync(
     `INSERT OR REPLACE INTO session_results
-     (id, sentence_id, direction, timestamp, interp_recording_uri, back_interp_text, original_text, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     (id, sentence_id, direction, timestamp, interp_recording_uri, back_interp_recording_uri, back_interp_text, original_text, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       result.id,
       result.sentenceId,
       result.direction,
       result.timestamp,
       result.interpRecordingUri ?? null,
+      result.backInterpRecordingUri ?? null,
       result.backInterpText,
       result.originalText,
       result.notes ?? null,

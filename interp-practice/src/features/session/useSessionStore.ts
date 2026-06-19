@@ -11,6 +11,7 @@ interface SessionState {
   direction: Direction;
   step: SessionStep;
   interpRecordingUri: string | null;
+  backInterpRecordingUri: string | null;
   backInterpText: string;
   isPlaying: boolean;
   isRecording: boolean;
@@ -23,6 +24,7 @@ interface SessionState {
   advanceQueue: () => boolean;
   setStep: (step: SessionStep) => void;
   setInterpRecordingUri: (uri: string) => void;
+  setBackInterpRecordingUri: (uri: string) => void;
   setBackInterpText: (text: string) => void;
   setIsPlaying: (val: boolean) => void;
   setIsRecording: (val: boolean) => void;
@@ -32,6 +34,7 @@ interface SessionState {
 const INITIAL_STEP_STATE = {
   step: "LISTEN_RECORD" as SessionStep,
   interpRecordingUri: null,
+  backInterpRecordingUri: null,
   backInterpText: "",
   isPlaying: false,
   isRecording: false,
@@ -75,6 +78,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   setStep: (step) => set({ step }),
   setInterpRecordingUri: (uri) => set({ interpRecordingUri: uri }),
+  setBackInterpRecordingUri: (uri) => set({ backInterpRecordingUri: uri }),
   setBackInterpText: (text) => set({ backInterpText: text }),
   setIsPlaying: (val) => set({ isPlaying: val }),
   setIsRecording: (val) => set({ isRecording: val }),
