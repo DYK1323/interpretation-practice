@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { getAllSettings, setSetting, getStringSetting, setStringSetting } from "../../src/db/settings";
 import { syncFromSheetUrl } from "../../src/utils/csvImport";
@@ -69,7 +70,11 @@ export default function SettingsScreen() {
     setExporting(true);
     try {
       const count = await exportCSV();
-      if (count === 0) Alert.alert("내보낼 문장 없음", "라이브러리에 문장을 추가하세요.");
+      if (count === 0) {
+        Alert.alert("내보낼 문장 없음", "라이브러리에 문장을 추가하세요.");
+      } else if (Platform.OS === "android") {
+        Alert.alert("내보내기 완료", `${count}개 문장이 Downloads 폴더에 저장됐습니다.`);
+      }
     } catch (e: any) {
       Alert.alert("내보내기 실패", e?.message ?? "알 수 없는 오류");
     } finally {
@@ -111,7 +116,7 @@ export default function SettingsScreen() {
       <View style={styles.group}>
         <Text style={styles.groupTitle}>데이터 내보내기</Text>
         <Text style={styles.desc}>
-          앱의 모든 문장을 CSV로 내보냅니다. 구글 시트에 가져오기 하거나 백업으로 보관하세요.
+          앱의 모든 문장을 CSV로 내보냅니다.{Platform.OS === "android" ? " Downloads 폴더에 저장됩니다." : " 구글 시트에 가져오기 하거나 백업으로 보관하세요."}
         </Text>
         <TouchableOpacity
           style={[styles.actionBtn, styles.actionBtnSecondary, exporting && styles.actionBtnDisabled]}
