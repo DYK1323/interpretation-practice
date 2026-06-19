@@ -102,6 +102,7 @@ export default function SettingsScreen() {
   }
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
       {/* 구글 시트 동기화 */}
@@ -298,6 +299,7 @@ export default function SettingsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+    </>
   );
 }
 
