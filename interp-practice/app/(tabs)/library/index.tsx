@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   TextInput,
   ScrollView,
+  Modal,
+  Pressable,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { getAllSentences, deleteSentence } from "../../../src/db/sentences";
@@ -31,11 +33,17 @@ export default function LibraryIndex() {
   const router = useRouter();
   const [sentences, setSentences] = useState<SentenceEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
 
   const [query, setQuery] = useState("");
   const [filterDiff, setFilterDiff] = useState<1 | 2 | 3 | null>(null);
   const [filterCat, setFilterCat] = useState<Category | null>(null);
   const [filterTag, setFilterTag] = useState<string | null>(null);
+
+  // draft state inside modal
+  const [draftDiff, setDraftDiff] = useState<1 | 2 | 3 | null>(null);
+  const [draftCat, setDraftCat] = useState<Category | null>(null);
+  const [draftTag, setDraftTag] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -73,7 +81,28 @@ export default function LibraryIndex() {
     });
   }, [sentences, query, filterDiff, filterCat, filterTag]);
 
-  const isFiltered = !!query || filterDiff !== null || filterCat !== null || filterTag !== null;
+  const activeFilterCount = (filterDiff ? 1 : 0) + (filterCat ? 1 : 0) + (filterTag ? 1 : 0);
+  const isFiltered = !!query || activeFilterCount > 0;
+
+  function openFilterModal() {
+    setDraftDiff(filterDiff);
+    setDraftCat(filterCat);
+    setDraftTag(filterTag);
+    setFilterModalVisible(true);
+  }
+
+  function applyFilter() {
+    setFilterDiff(draftDiff);
+    setFilterCat(draftCat);
+    setFilterTag(draftTag);
+    setFilterModalVisible(false);
+  }
+
+  function resetFilter() {
+    setDraftDiff(null);
+    setDraftCat(null);
+    setDraftTag(null);
+  }
 
   function handleDelete(id: string) {
     Alert.alert("문장 삭제", "이 문장을 삭제할까요?", [
@@ -96,9 +125,19 @@ export default function LibraryIndex() {
         <Text style={styles.count}>
           {isFiltered ? `${filtered.length} / ${sentences.length}개` : `${sentences.length}개 문장`}
         </Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => router.push("/library-edit/new")}>
-          <Text style={styles.addBtnText}>+ 추가</Text>
-        </TouchableOpacity>
+        <View style={styles.toolbarRight}>
+          <TouchableOpacity style={styles.filterBtn} onPress={openFilterModal}>
+            <Text style={styles.filterBtnText}>필터</Text>
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addBtn} onPress={() => router.push("/library-edit/new")}>
+            <Text style={styles.addBtnText}>+ 추가</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* 검색 */}
@@ -109,7 +148,6 @@ export default function LibraryIndex() {
           placeholderTextColor="#9CA3AF"
           value={query}
           onChangeText={setQuery}
-          clearButtonMode="while-editing"
           returnKeyType="search"
         />
         {query.length > 0 && (
@@ -119,70 +157,17 @@ export default function LibraryIndex() {
         )}
       </View>
 
-      {/* 필터 */}
-      <View style={styles.filterArea}>
-        {/* 난이도 */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          <Text style={styles.filterLabel}>난이도</Text>
-          <TouchableOpacity
-            style={[styles.chip, filterDiff === null && styles.chipActive]}
-            onPress={() => setFilterDiff(null)}
-          >
-            <Text style={[styles.chipText, filterDiff === null && styles.chipTextActive]}>전체</Text>
+      {/* 활성 필터 요약 */}
+      {activeFilterCount > 0 && (
+        <View style={styles.activeSummary}>
+          {filterDiff && <Text style={styles.activeChip}>{"★".repeat(filterDiff) + "☆".repeat(3 - filterDiff)}</Text>}
+          {filterCat && <Text style={styles.activeChip}>{CATEGORIES.find(c => c.key === filterCat)?.label}</Text>}
+          {filterTag && <Text style={styles.activeChip}>{filterTag}</Text>}
+          <TouchableOpacity onPress={() => { setFilterDiff(null); setFilterCat(null); setFilterTag(null); }}>
+            <Text style={styles.clearAllText}>전체 해제</Text>
           </TouchableOpacity>
-          {DIFFICULTIES.map((d) => (
-            <TouchableOpacity
-              key={d.value}
-              style={[styles.chip, filterDiff === d.value && styles.chipActive]}
-              onPress={() => setFilterDiff(filterDiff === d.value ? null : d.value)}
-            >
-              <Text style={[styles.chipText, filterDiff === d.value && styles.chipTextActive]}>{d.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* 카테고리 */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          <Text style={styles.filterLabel}>카테고리</Text>
-          <TouchableOpacity
-            style={[styles.chip, filterCat === null && styles.chipActive]}
-            onPress={() => setFilterCat(null)}
-          >
-            <Text style={[styles.chipText, filterCat === null && styles.chipTextActive]}>전체</Text>
-          </TouchableOpacity>
-          {CATEGORIES.map((c) => (
-            <TouchableOpacity
-              key={c.key}
-              style={[styles.chip, filterCat === c.key && styles.chipActive]}
-              onPress={() => setFilterCat(filterCat === c.key ? null : c.key)}
-            >
-              <Text style={[styles.chipText, filterCat === c.key && styles.chipTextActive]}>{c.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* 태그 */}
-        {allTags.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-            <Text style={styles.filterLabel}>태그</Text>
-            <TouchableOpacity
-              style={[styles.chip, filterTag === null && styles.chipActive]}
-              onPress={() => setFilterTag(null)}
-            >
-              <Text style={[styles.chipText, filterTag === null && styles.chipTextActive]}>전체</Text>
-            </TouchableOpacity>
-            {allTags.map((t) => (
-              <TouchableOpacity
-                key={t}
-                style={[styles.chip, filterTag === t && styles.chipActive]}
-                onPress={() => setFilterTag(filterTag === t ? null : t)}
-              >
-                <Text style={[styles.chipText, filterTag === t && styles.chipTextActive]}>{t}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-      </View>
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.center}>
@@ -235,6 +220,96 @@ export default function LibraryIndex() {
           )}
         />
       )}
+
+      {/* 필터 모달 */}
+      <Modal
+        visible={filterModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setFilterModalVisible(false)} />
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>필터</Text>
+            <TouchableOpacity onPress={resetFilter}>
+              <Text style={styles.resetText}>초기화</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.sheetBody} showsVerticalScrollIndicator={false}>
+            {/* 난이도 */}
+            <Text style={styles.sectionLabel}>난이도</Text>
+            <View style={styles.chipWrap}>
+              <TouchableOpacity
+                style={[styles.chip, draftDiff === null && styles.chipActive]}
+                onPress={() => setDraftDiff(null)}
+              >
+                <Text style={[styles.chipText, draftDiff === null && styles.chipTextActive]}>전체</Text>
+              </TouchableOpacity>
+              {DIFFICULTIES.map((d) => (
+                <TouchableOpacity
+                  key={d.value}
+                  style={[styles.chip, draftDiff === d.value && styles.chipActive]}
+                  onPress={() => setDraftDiff(draftDiff === d.value ? null : d.value)}
+                >
+                  <Text style={[styles.chipText, draftDiff === d.value && styles.chipTextActive]}>{d.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* 카테고리 */}
+            <Text style={styles.sectionLabel}>카테고리</Text>
+            <View style={styles.chipWrap}>
+              <TouchableOpacity
+                style={[styles.chip, draftCat === null && styles.chipActive]}
+                onPress={() => setDraftCat(null)}
+              >
+                <Text style={[styles.chipText, draftCat === null && styles.chipTextActive]}>전체</Text>
+              </TouchableOpacity>
+              {CATEGORIES.map((c) => (
+                <TouchableOpacity
+                  key={c.key}
+                  style={[styles.chip, draftCat === c.key && styles.chipActive]}
+                  onPress={() => setDraftCat(draftCat === c.key ? null : c.key)}
+                >
+                  <Text style={[styles.chipText, draftCat === c.key && styles.chipTextActive]}>{c.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* 태그 */}
+            {allTags.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>태그</Text>
+                <View style={styles.chipWrap}>
+                  <TouchableOpacity
+                    style={[styles.chip, draftTag === null && styles.chipActive]}
+                    onPress={() => setDraftTag(null)}
+                  >
+                    <Text style={[styles.chipText, draftTag === null && styles.chipTextActive]}>전체</Text>
+                  </TouchableOpacity>
+                  {allTags.map((t) => (
+                    <TouchableOpacity
+                      key={t}
+                      style={[styles.chip, draftTag === t && styles.chipActive]}
+                      onPress={() => setDraftTag(draftTag === t ? null : t)}
+                    >
+                      <Text style={[styles.chipText, draftTag === t && styles.chipTextActive]}>{t}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+          </ScrollView>
+
+          <TouchableOpacity style={styles.applyBtn} onPress={applyFilter}>
+            <Text style={styles.applyBtnText}>적용하기</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -252,6 +327,28 @@ const styles = StyleSheet.create({
     borderBottomColor: "#E5E7EB",
   },
   count: { fontSize: 14, color: "#6B7280", fontWeight: "500" },
+  toolbarRight: { flexDirection: "row", gap: 8, alignItems: "center" },
+  filterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    gap: 6,
+  },
+  filterBtnText: { fontSize: 13, fontWeight: "600", color: "#374151" },
+  filterBadge: {
+    backgroundColor: "#1A56DB",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: { fontSize: 11, color: "#FFFFFF", fontWeight: "700" },
   addBtn: {
     backgroundColor: "#059669",
     paddingVertical: 8,
@@ -279,38 +376,27 @@ const styles = StyleSheet.create({
   },
   clearBtn: { position: "absolute", right: 24, padding: 4 },
   clearBtnText: { fontSize: 13, color: "#9CA3AF" },
-  filterArea: {
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    paddingVertical: 8,
-    gap: 4,
-  },
-  filterRow: {
+  activeSummary: {
     flexDirection: "row",
-    alignItems: "center",
+    flexWrap: "wrap",
     gap: 6,
     paddingHorizontal: 16,
-    paddingVertical: 4,
+    paddingVertical: 8,
+    backgroundColor: "#F0F9FF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#BAE6FD",
+    alignItems: "center",
   },
-  filterLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#9CA3AF",
-    marginRight: 2,
-    width: 40,
+  activeChip: {
+    fontSize: 12,
+    color: "#0369A1",
+    backgroundColor: "#BAE6FD",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    fontWeight: "600",
   },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 16,
-    backgroundColor: "#F3F4F6",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  chipActive: { backgroundColor: "#1A56DB", borderColor: "#1A56DB" },
-  chipText: { fontSize: 12, color: "#374151", fontWeight: "500" },
-  chipTextActive: { color: "#FFFFFF" },
+  clearAllText: { fontSize: 12, color: "#6B7280", textDecorationLine: "underline" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
   emptyIcon: { fontSize: 48 },
@@ -343,4 +429,69 @@ const styles = StyleSheet.create({
   enText: { fontSize: 15, color: "#111827", lineHeight: 22 },
   koText: { fontSize: 14, color: "#6B7280", lineHeight: 20 },
   notesPreview: { fontSize: 12, color: "#92400E", lineHeight: 18 },
+
+  // 모달
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  sheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+    paddingBottom: 32,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: "#D1D5DB",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  sheetTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
+  resetText: { fontSize: 14, color: "#6B7280" },
+  sheetBody: { paddingHorizontal: 20, paddingTop: 8 },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+    marginTop: 16,
+    marginBottom: 10,
+  },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  chipActive: { backgroundColor: "#1A56DB", borderColor: "#1A56DB" },
+  chipText: { fontSize: 13, color: "#374151", fontWeight: "500" },
+  chipTextActive: { color: "#FFFFFF" },
+  applyBtn: {
+    margin: 16,
+    backgroundColor: "#1A56DB",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  applyBtnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
 });
