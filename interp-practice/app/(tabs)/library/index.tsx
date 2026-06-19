@@ -97,7 +97,7 @@ export default function LibraryIndex() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => router.push("/library/new")}
+            onPress={() => router.push("/library-edit/new")}
           >
             <Text style={styles.addBtnText}>+ 추가</Text>
           </TouchableOpacity>
@@ -129,7 +129,7 @@ export default function LibraryIndex() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
-              onPress={() => router.push(`/library/${item.id}`)}
+              onPress={() => router.push(`/library-edit/${item.id}`)}
               onLongPress={() => handleDelete(item.id)}
             >
               <View style={styles.cardHeader}>
