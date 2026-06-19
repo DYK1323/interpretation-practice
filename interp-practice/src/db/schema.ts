@@ -1,16 +1,12 @@
 import * as SQLite from "expo-sqlite";
 
 let db: SQLite.SQLiteDatabase | null = null;
+let initPromise: Promise<void> | null = null;
 
-export async function getDB(): Promise<SQLite.SQLiteDatabase> {
-  if (!db) {
-    db = await SQLite.openDatabaseAsync("interp.db");
-  }
-  return db;
-}
+async function _runInit(): Promise<void> {
+  const database = await SQLite.openDatabaseAsync("interp.db");
+  db = database;
 
-export async function initDB(): Promise<void> {
-  const database = await getDB();
   await database.execAsync(`PRAGMA journal_mode = WAL;`);
 
   await database.execAsync(`
@@ -63,4 +59,17 @@ export async function initDB(): Promise<void> {
   if (!cols.some(c => c.name === "notes")) {
     await database.execAsync(`ALTER TABLE sentences ADD COLUMN notes TEXT`);
   }
+}
+
+export function initDB(): Promise<void> {
+  if (!initPromise) {
+    initPromise = _runInit();
+  }
+  return initPromise;
+}
+
+// All DB access goes through here — waits for full init before returning
+export async function getDB(): Promise<SQLite.SQLiteDatabase> {
+  await initDB();
+  return db!;
 }
