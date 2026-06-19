@@ -28,12 +28,21 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
+function stableId(text: string): string {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = (Math.imul(31, hash) + text.charCodeAt(i)) | 0;
+  }
+  return "auto_" + Math.abs(hash).toString(16).padStart(8, "0");
+}
+
 function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
   const get = (key: string) => cols[headers.indexOf(key)]?.trim() ?? "";
 
-  const id = get("id");
   const englishText = get("englishText");
-  if (!id || !englishText) return null;
+  if (!englishText) return null;
+
+  const id = get("id") || stableId(englishText);
 
   const tagsRaw = get("tags");
   const tags = tagsRaw
