@@ -36,7 +36,11 @@ function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
   if (!id || !englishText) return null;
 
   const tagsRaw = get("tags");
-  const tags = tagsRaw ? tagsRaw.split("|").map((t) => t.trim()) : [];
+  const tags = tagsRaw
+    ? tagsRaw.includes("|")
+      ? tagsRaw.split("|").map((t) => t.trim()).filter(Boolean)
+      : tagsRaw.split(/\s+/).filter(Boolean)
+    : [];
 
   const koreanText = get("koreanText") || undefined;
   const modelKorean = get("modelKorean") || undefined;
