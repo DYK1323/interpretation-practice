@@ -26,7 +26,8 @@
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/225c04e8-5135-417f-b2bd-698eeb7066a1"
     },
     "runtimeVersion": {
       "policy": "fingerprint"
