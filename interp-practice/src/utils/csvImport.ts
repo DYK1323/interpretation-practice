@@ -1,5 +1,5 @@
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import { File } from "expo-file-system";
 import { upsertSentence } from "../db/sentences";
 import type { SentenceEntry, Category } from "../types";
 
@@ -65,17 +65,7 @@ function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
   };
 }
 
-export async function importCSV(): Promise<{ imported: number; failed: number }> {
-  const result = await DocumentPicker.getDocumentAsync({
-    type: ["text/csv", "text/comma-separated-values", "text/plain"],
-    copyToCacheDirectory: true,
-  });
-
-  if (result.canceled || !result.assets?.[0]) {
-    return { imported: 0, failed: 0 };
-  }
-
-  const content = await FileSystem.readAsStringAsync(result.assets[0].uri);
+async function importCSVContent(content: string): Promise<{ imported: number; failed: number }> {
   const lines = content.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return { imported: 0, failed: 0 };
 
@@ -99,4 +89,34 @@ export async function importCSV(): Promise<{ imported: number; failed: number }>
   }
 
   return { imported, failed };
+}
+
+export async function importCSV(): Promise<{ imported: number; failed: number }> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: ["text/csv", "text/comma-separated-values", "text/plain"],
+    copyToCacheDirectory: true,
+  });
+
+  if (result.canceled || !result.assets?.[0]) {
+    return { imported: 0, failed: 0 };
+  }
+
+  const content = await new File(result.assets[0].uri).text();
+  return importCSVContent(content);
+}
+
+function toCSVExportUrl(url: string): string {
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (match) {
+    return `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+  }
+  return url.trim();
+}
+
+export async function syncFromSheetUrl(rawUrl: string): Promise<{ imported: number; failed: number }> {
+  const csvUrl = toCSVExportUrl(rawUrl);
+  const response = await fetch(csvUrl);
+  if (!response.ok) throw new Error(`시트 불러오기 실패 (HTTP ${response.status})`);
+  const content = await response.text();
+  return importCSVContent(content);
 }

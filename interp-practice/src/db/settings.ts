@@ -23,6 +23,23 @@ export async function setSetting<K extends keyof UserSettings>(
   );
 }
 
+export async function getStringSetting(key: string): Promise<string | null> {
+  const db = await getDB();
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM user_settings WHERE key = ?",
+    [key]
+  );
+  return row ? row.value : null;
+}
+
+export async function setStringSetting(key: string, value: string): Promise<void> {
+  const db = await getDB();
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
+    [key, value]
+  );
+}
+
 export async function getAllSettings(): Promise<UserSettings> {
   const db = await getDB();
   const rows = await db.getAllAsync<{ key: string; value: string }>(

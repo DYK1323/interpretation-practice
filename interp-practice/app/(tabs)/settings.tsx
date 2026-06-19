@@ -7,8 +7,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from "react-native";
-import { getAllSettings, setSetting } from "../../src/db/settings";
+import { getAllSettings, setSetting, getStringSetting, setStringSetting } from "../../src/db/settings";
+import { syncFromSheetUrl } from "../../src/utils/csvImport";
+import { exportCSV } from "../../src/utils/csvExport";
 import type { UserSettings } from "../../src/types";
 import { DEFAULT_SETTINGS } from "../../src/types";
 
@@ -20,6 +24,9 @@ const SPEEDS = [
 
 export default function SettingsScreen() {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -28,6 +35,8 @@ export default function SettingsScreen() {
   async function loadSettings() {
     const s = await getAllSettings();
     setSettings(s);
+    const url = await getStringSetting("sheetSyncUrl");
+    if (url) setSheetUrl(url);
   }
 
   async function updateSetting<K extends keyof UserSettings>(key: K, value: UserSettings[K]) {
@@ -35,8 +44,88 @@ export default function SettingsScreen() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }
 
+  async function handleSync() {
+    const url = sheetUrl.trim();
+    if (!url) {
+      Alert.alert("URL 필요", "구글 시트 공유 링크를 입력하세요.");
+      return;
+    }
+    await setStringSetting("sheetSyncUrl", url);
+    setSyncing(true);
+    try {
+      const { imported, failed } = await syncFromSheetUrl(url);
+      Alert.alert(
+        "동기화 완료",
+        `${imported}개 문장 가져옴${failed > 0 ? `, ${failed}개 실패` : ""}`
+      );
+    } catch (e: any) {
+      Alert.alert("동기화 실패", e?.message ?? "알 수 없는 오류");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const count = await exportCSV();
+      if (count === 0) Alert.alert("내보낼 문장 없음", "라이브러리에 문장을 추가하세요.");
+    } catch (e: any) {
+      Alert.alert("내보내기 실패", e?.message ?? "알 수 없는 오류");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+
+      {/* 구글 시트 동기화 */}
+      <View style={styles.group}>
+        <Text style={styles.groupTitle}>구글 시트 동기화</Text>
+        <Text style={styles.desc}>
+          시트를 "링크 있는 모든 사용자 보기"로 공유한 뒤 링크를 붙여넣으세요.
+        </Text>
+        <TextInput
+          style={styles.urlInput}
+          placeholder="https://docs.google.com/spreadsheets/d/..."
+          placeholderTextColor="#9CA3AF"
+          value={sheetUrl}
+          onChangeText={setSheetUrl}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <TouchableOpacity
+          style={[styles.actionBtn, syncing && styles.actionBtnDisabled]}
+          onPress={handleSync}
+          disabled={syncing}
+        >
+          {syncing
+            ? <ActivityIndicator size="small" color="#FFFFFF" />
+            : <Text style={styles.actionBtnText}>시트에서 문장 가져오기</Text>
+          }
+        </TouchableOpacity>
+      </View>
+
+      {/* CSV 내보내기 */}
+      <View style={styles.group}>
+        <Text style={styles.groupTitle}>데이터 내보내기</Text>
+        <Text style={styles.desc}>
+          앱의 모든 문장을 CSV로 내보냅니다. 구글 시트에 가져오기 하거나 백업으로 보관하세요.
+        </Text>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnSecondary, exporting && styles.actionBtnDisabled]}
+          onPress={handleExport}
+          disabled={exporting}
+        >
+          {exporting
+            ? <ActivityIndicator size="small" color="#1A56DB" />
+            : <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>CSV 내보내기</Text>
+          }
+        </TouchableOpacity>
+      </View>
+
+      {/* 연습 설정 */}
       <View style={styles.group}>
         <Text style={styles.groupTitle}>연습 설정</Text>
 
@@ -57,6 +146,7 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* TTS 속도 */}
       <View style={styles.group}>
         <Text style={styles.groupTitle}>TTS 재생 속도</Text>
         {SPEEDS.map((s) => (
@@ -76,6 +166,7 @@ export default function SettingsScreen() {
         ))}
       </View>
 
+      {/* 정보 */}
       <View style={styles.group}>
         <Text style={styles.groupTitle}>정보</Text>
         <View style={styles.infoRow}>
@@ -109,7 +200,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    gap: 4,
+    gap: 12,
   },
   groupTitle: {
     fontSize: 13,
@@ -117,8 +208,31 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginBottom: 12,
   },
+  desc: { fontSize: 13, color: "#6B7280", lineHeight: 19 },
+  urlInput: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 13,
+    color: "#111827",
+    backgroundColor: "#F9FAFB",
+  },
+  actionBtn: {
+    backgroundColor: "#1A56DB",
+    paddingVertical: 13,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  actionBtnSecondary: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: "#1A56DB",
+  },
+  actionBtnDisabled: { opacity: 0.5 },
+  actionBtnText: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
+  actionBtnTextSecondary: { color: "#1A56DB" },
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -131,7 +245,7 @@ const styles = StyleSheet.create({
   radioRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 8,
     gap: 12,
   },
   radioCircle: {
