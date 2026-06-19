@@ -96,6 +96,7 @@ export default function PracticeHome() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={{ fontSize: 10, color: "#9CA3AF", textAlign: "center", marginBottom: 4 }}>v3-test</Text>
       {/* 통계 */}
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
