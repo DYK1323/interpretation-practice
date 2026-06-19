@@ -7,7 +7,6 @@ import {
   Animated,
 } from "react-native";
 import { useAudioRecorder, RecordingPresets, setAudioModeAsync } from "expo-audio";
-import { File } from "expo-file-system";
 
 interface Props {
   onRecordingComplete: (uri: string) => void;
@@ -60,10 +59,7 @@ export function RecordButton({ onRecordingComplete, onRecordingStart }: Props) {
       setIsRecording(false);
       const uri = recorder.uri;
       if (uri) {
-        const file = new File(uri);
-        if (file.exists && file.size > 0) {
-          onRecordingComplete(uri);
-        }
+        onRecordingComplete(uri);
       }
     } else {
       await recorder.prepareToRecordAsync();
