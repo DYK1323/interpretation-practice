@@ -6,10 +6,12 @@ import {
 import type { Direction } from "../../types";
 import { getSTTLocale } from "./sessionMachine";
 
-export function useSTT(direction: Direction) {
+export function useSTT(direction: Direction, onEnd?: (text: string) => void) {
   const [transcript, setTranscript] = useState("");
   const [isListening, setIsListening] = useState(false);
   const finalTranscript = useRef("");
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
 
   useSpeechRecognitionEvent("start", () => {
     setIsListening(true);
@@ -19,6 +21,7 @@ export function useSTT(direction: Direction) {
 
   useSpeechRecognitionEvent("end", () => {
     setIsListening(false);
+    onEndRef.current?.(finalTranscript.current);
   });
 
   useSpeechRecognitionEvent("result", (event) => {
@@ -35,6 +38,8 @@ export function useSTT(direction: Direction) {
   });
 
   const startListening = useCallback(() => {
+    finalTranscript.current = "";
+    setTranscript("");
     ExpoSpeechRecognitionModule.start({
       lang: getSTTLocale(direction),
       interimResults: true,
@@ -42,9 +47,8 @@ export function useSTT(direction: Direction) {
     });
   }, [direction]);
 
-  const stopListening = useCallback((): string => {
+  const stopListening = useCallback(() => {
     ExpoSpeechRecognitionModule.stop();
-    return finalTranscript.current;
   }, []);
 
   return { transcript, isListening, startListening, stopListening };

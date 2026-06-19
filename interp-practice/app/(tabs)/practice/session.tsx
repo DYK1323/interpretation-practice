@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   AppState,
+  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
@@ -32,11 +33,37 @@ export default function SessionScreen() {
   const { sentence, direction, step, interpRecordingUri, backInterpText,
     queue, queueIndex, setStep, setInterpRecordingUri, setBackInterpText,
     advanceQueue, reset } = useSessionStore();
-  const { transcript, isListening, startListening, stopListening } = useSTT(direction);
+
+  // STT auto-advances to COMPARE when recognition ends
+  const { transcript, isListening, startListening, stopListening } = useSTT(
+    direction,
+    (text) => {
+      setBackInterpText(text);
+      const next = getNextStep("PLAYBACK_BACK");
+      if (next) setStep(next);
+    }
+  );
+
   const [notes, setNotes] = useState("");
   const [showSourceText, setShowSourceText] = useState(false);
   const [sessionSaved, setSessionSaved] = useState(false);
   const appState = useRef(AppState.currentState);
+
+  const sttPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (isListening) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(sttPulse, { toValue: 1.15, duration: 600, useNativeDriver: true }),
+          Animated.timing(sttPulse, { toValue: 1, duration: 600, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      sttPulse.stopAnimation();
+      sttPulse.setValue(1);
+    }
+  }, [isListening]);
 
   useEffect(() => {
     setNotes("");
@@ -75,24 +102,10 @@ export default function SessionScreen() {
     : (s.modelEnglish ?? s.englishText);
   if (!sourceText) return null;
 
-  function advance() {
-    const next = getNextStep(step);
-    if (next) setStep(next);
-  }
-
   function handleInterpComplete(uri: string) {
     setInterpRecordingUri(uri);
-    advance();
-  }
-
-  function handleBackStart() {
-    startListening();
-  }
-
-  function handleBackComplete(uri: string) {
-    const finalText = stopListening();
-    setBackInterpText(finalText || transcript);
-    advance();
+    const next = getNextStep("LISTEN_RECORD");
+    if (next) setStep(next);
   }
 
   async function handleScheduleReview(days: number, difficulty: 1 | 2 | 3) {
@@ -159,6 +172,7 @@ export default function SessionScreen() {
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
 
+        {/* Step 1: 원문 듣기 + 통역 녹음 */}
         {step === "LISTEN_RECORD" && (
           <View style={styles.stepContent}>
             <Text style={styles.stepDesc}>{stepDesc}</Text>
@@ -180,26 +194,44 @@ export default function SessionScreen() {
           </View>
         )}
 
+        {/* Step 2: 내 통역 듣기 + STT로 재통역 */}
         {step === "PLAYBACK_BACK" && interpRecordingUri && (
           <View style={styles.stepContent}>
             <Text style={styles.stepDesc}>{stepDesc}</Text>
             <AudioPlayer source={{ type: "file", uri: interpRecordingUri }} />
             <View style={styles.divider} />
-            <Text style={styles.subLabel}>준비되면 재통역을 녹음하세요</Text>
-            {isListening && transcript ? (
+            <Text style={styles.subLabel}>준비되면 재통역을 말하세요</Text>
+            {transcript ? (
               <View style={styles.liveTranscript}>
                 <Text style={styles.liveTranscriptText}>{transcript}</Text>
               </View>
             ) : null}
-            <RecordButton
-              onRecordingStart={handleBackStart}
-              onRecordingComplete={handleBackComplete}
-            />
+            <View style={styles.sttBtnContainer}>
+              <Animated.View style={{ transform: [{ scale: sttPulse }] }}>
+                <TouchableOpacity
+                  style={[styles.sttBtn, isListening && styles.sttBtnActive]}
+                  onPress={isListening ? stopListening : startListening}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.sttBtnIcon}>{isListening ? "■" : "●"}</Text>
+                </TouchableOpacity>
+              </Animated.View>
+              <Text style={styles.sttBtnLabel}>
+                {isListening ? "탭하여 완료" : "탭하여 말하기"}
+              </Text>
+            </View>
           </View>
         )}
 
+        {/* Step 3: 비교 */}
         {step === "COMPARE" && (
           <View style={styles.compareContainer}>
+            {interpRecordingUri ? (
+              <View style={styles.replaySection}>
+                <Text style={styles.replaySectionLabel}>내 통역 다시 듣기</Text>
+                <AudioPlayer source={{ type: "file", uri: interpRecordingUri }} />
+              </View>
+            ) : null}
             <CompareView
               originalText={sourceText}
               backInterpText={backInterpText}
@@ -238,11 +270,9 @@ export default function SessionScreen() {
                 ))}
               </View>
             </View>
-            <View style={styles.actionRow}>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={handleRetry}>
-                <Text style={styles.secondaryBtnText}>다시 연습</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
+              <Text style={styles.retryBtnText}>다시 연습</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -266,7 +296,26 @@ const styles = StyleSheet.create({
   subLabel: { fontSize: 13, color: "#9CA3AF" },
   liveTranscript: { backgroundColor: "#F0F9FF", borderRadius: 12, padding: 16, width: "100%", borderWidth: 1, borderColor: "#BAE6FD" },
   liveTranscriptText: { fontSize: 15, color: "#0369A1", lineHeight: 22 },
+  sttBtnContainer: { alignItems: "center", gap: 12 },
+  sttBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#1A56DB",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#1A56DB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  sttBtnActive: { backgroundColor: "#EF4444", shadowColor: "#EF4444" },
+  sttBtnIcon: { fontSize: 28, color: "#FFFFFF" },
+  sttBtnLabel: { fontSize: 14, color: "#6B7280" },
   compareContainer: { flex: 1, gap: 0 },
+  replaySection: { marginBottom: 16 },
+  replaySectionLabel: { fontSize: 13, fontWeight: "600", color: "#6B7280", marginBottom: 8 },
   notesSection: { marginTop: 16 },
   notesLabel: { fontSize: 13, fontWeight: "600", color: "#6B7280", marginBottom: 8 },
   notesInput: { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, padding: 12, fontSize: 15, color: "#111827", minHeight: 80, textAlignVertical: "top" },
@@ -279,7 +328,13 @@ const styles = StyleSheet.create({
   diffEasy: { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" },
   difficultyStars: { fontSize: 13, fontWeight: "700", color: "#374151" },
   difficultySublabel: { fontSize: 11, color: "#6B7280" },
-  actionRow: { flexDirection: "row", gap: 12, marginTop: 16, justifyContent: "center" },
-  secondaryBtn: { paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12, borderWidth: 2, borderColor: "#E5E7EB" },
-  secondaryBtnText: { fontSize: 15, fontWeight: "600", color: "#374151" },
+  retryBtn: {
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+  },
+  retryBtnText: { fontSize: 15, fontWeight: "600", color: "#374151" },
 });
