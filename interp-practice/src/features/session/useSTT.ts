@@ -43,7 +43,7 @@ export function useSTT(direction: Direction, onEnd?: (text: string) => void) {
     ExpoSpeechRecognitionModule.start({
       lang: getSTTLocale(direction),
       interimResults: true,
-      continuous: false,
+      continuous: true,
     });
   }, [direction]);
 
