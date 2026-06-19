@@ -11,9 +11,11 @@ import {
 import { useRouter, useFocusEffect } from "expo-router";
 import { getDueWithSentences, getNewSentences } from "../../../src/db/progress";
 import { getHeatmapData, getStats } from "../../../src/db/results";
+import { getAllSettings } from "../../../src/db/settings";
 import { useSessionStore } from "../../../src/features/session/useSessionStore";
 import { Heatmap } from "../../../src/components/Heatmap";
-import type { Direction, Category } from "../../../src/types";
+import type { Direction, Category, UserSettings } from "../../../src/types";
+import { DEFAULT_SETTINGS } from "../../../src/types";
 import type { QueueItem } from "../../../src/features/session/useSessionStore";
 
 const CATEGORIES: { key: Category; label: string }[] = [
@@ -23,7 +25,14 @@ const CATEGORIES: { key: Category; label: string }[] = [
   { key: "daily",      label: "일상" },
 ];
 
-const NEW_SENTENCE_LIMIT = 10;
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 export default function PracticeHome() {
   const router = useRouter();
@@ -35,6 +44,7 @@ export default function PracticeHome() {
   const [newCount, setNewCount] = useState(0);
   const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
   const [stats, setStats] = useState({ streak: 0, totalSentences: 0, todayCount: 0 });
+  const [practiceSettings, setPracticeSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [queueCache, setQueueCache] = useState<{
     due: QueueItem[];
@@ -49,9 +59,11 @@ export default function PracticeHome() {
 
   async function loadData() {
     setLoading(true);
+    const s = await getAllSettings();
+    setPracticeSettings(s);
     const [due, newSentences, heatmap, statsData] = await Promise.all([
       getDueWithSentences(),
-      getNewSentences(direction, selectedCategory, NEW_SENTENCE_LIMIT),
+      getNewSentences(direction, selectedCategory, s.dailyNewLimit),
       getHeatmapData(84),
       getStats(),
     ]);
@@ -75,11 +87,12 @@ export default function PracticeHome() {
   );
 
   function handleStart() {
-    const queue = [...queueCache.due, ...queueCache.newItems];
+    let queue = [...queueCache.due, ...queueCache.newItems];
     if (queue.length === 0) {
       Alert.alert("학습할 문장 없음", "라이브러리에 문장을 추가하거나 복습 일정이 돌아올 때까지 기다려주세요.");
       return;
     }
+    if (practiceSettings.shuffleSentences) queue = shuffle(queue);
     startQueue(queue);
     router.push("/practice/session");
   }
@@ -159,7 +172,7 @@ export default function PracticeHome() {
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={styles.newLimit}>새 문장은 최대 {NEW_SENTENCE_LIMIT}개까지 추가됩니다</Text>
+          <Text style={styles.newLimit}>새 문장은 최대 {practiceSettings.dailyNewLimit}개까지 추가됩니다</Text>
         </View>
 
         <TouchableOpacity

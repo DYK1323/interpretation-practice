@@ -151,6 +151,37 @@ export default function SettingsScreen() {
             thumbColor="#FFFFFF"
           />
         </View>
+
+        <View style={styles.row}>
+          <View style={styles.rowLeft}>
+            <Text style={styles.rowTitle}>문장 순서 섞기</Text>
+            <Text style={styles.rowDesc}>ON이면 매번 무작위 순서로 학습합니다.</Text>
+          </View>
+          <Switch
+            value={settings.shuffleSentences}
+            onValueChange={(v) => updateSetting("shuffleSentences", v)}
+            trackColor={{ true: "#1A56DB", false: "#E5E7EB" }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+
+        <View style={styles.limitSection}>
+          <Text style={styles.rowTitle}>하루 새 문장 수</Text>
+          <Text style={styles.rowDesc}>복습 문장 외에 추가할 새 문장의 최대 개수입니다.</Text>
+          <View style={styles.chipRow}>
+            {[5, 10, 15, 20, 30, 50].map((n) => (
+              <TouchableOpacity
+                key={n}
+                style={[styles.chip, settings.dailyNewLimit === n && styles.chipActive]}
+                onPress={() => updateSetting("dailyNewLimit", n)}
+              >
+                <Text style={[styles.chipText, settings.dailyNewLimit === n && styles.chipTextActive]}>
+                  {n}개
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
       </View>
 
       {/* TTS 속도 */}
@@ -250,6 +281,19 @@ const styles = StyleSheet.create({
   rowLeft: { flex: 1, gap: 4 },
   rowTitle: { fontSize: 15, fontWeight: "600", color: "#111827" },
   rowDesc: { fontSize: 13, color: "#6B7280", lineHeight: 19 },
+  limitSection: { gap: 8 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  chipActive: { backgroundColor: "#1A56DB", borderColor: "#1A56DB" },
+  chipText: { fontSize: 13, color: "#374151", fontWeight: "500" },
+  chipTextActive: { color: "#FFFFFF" },
   radioRow: {
     flexDirection: "row",
     alignItems: "center",

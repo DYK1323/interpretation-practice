@@ -45,11 +45,15 @@ export interface SessionResult {
 export interface UserSettings {
   showSourceTextDuringListen: boolean;
   playbackSpeed: 0.75 | 1.0 | 1.25;
+  shuffleSentences: boolean;
+  dailyNewLimit: number;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
   showSourceTextDuringListen: false,
   playbackSpeed: 1.0,
+  shuffleSentences: true,
+  dailyNewLimit: 10,
 };
 
 export type SessionStep =
