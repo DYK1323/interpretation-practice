@@ -1,3 +1,4 @@
+import { File } from "expo-file-system";
 import { getDB } from "./schema";
 import type { SessionResult, Direction } from "../types";
 
@@ -12,6 +13,26 @@ function rowToResult(row: any): SessionResult {
     originalText: row.original_text,
     notes: row.notes ?? undefined,
   };
+}
+
+async function pruneOldRecordings(sentenceId: string, direction: Direction, keepCount = 2) {
+  const db = await getDB();
+  const rows = await db.getAllAsync<{ id: string; interp_recording_uri: string }>(
+    `SELECT id, interp_recording_uri FROM session_results
+     WHERE sentence_id = ? AND direction = ? AND interp_recording_uri IS NOT NULL
+     ORDER BY timestamp DESC`,
+    [sentenceId, direction]
+  );
+  for (const row of rows.slice(keepCount)) {
+    try {
+      const file = new File(row.interp_recording_uri);
+      if (file.exists) file.delete();
+    } catch {}
+    await db.runAsync(
+      "UPDATE session_results SET interp_recording_uri = NULL WHERE id = ?",
+      [row.id]
+    );
+  }
 }
 
 export async function saveResult(result: SessionResult): Promise<void> {
@@ -31,6 +52,7 @@ export async function saveResult(result: SessionResult): Promise<void> {
       result.notes ?? null,
     ]
   );
+  await pruneOldRecordings(result.sentenceId, result.direction, 2);
 }
 
 export async function updateNotes(id: string, notes: string): Promise<void> {

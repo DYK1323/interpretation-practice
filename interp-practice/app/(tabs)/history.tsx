@@ -10,6 +10,7 @@ import {
 import { useFocusEffect } from "expo-router";
 import { getAllResults } from "../../src/db/results";
 import { getSentenceById } from "../../src/db/sentences";
+import { AudioPlayer } from "../../src/components/AudioPlayer";
 import type { SessionResult, SentenceEntry } from "../../src/types";
 
 interface ResultWithSentence {
@@ -99,6 +100,12 @@ export default function HistoryScreen() {
             {isExpanded && (
               <View style={styles.expanded}>
                 <View style={styles.divider} />
+                {result.interpRecordingUri ? (
+                  <>
+                    <Text style={styles.expandLabel}>내 통역 녹음</Text>
+                    <AudioPlayer source={{ type: "file", uri: result.interpRecordingUri }} />
+                  </>
+                ) : null}
                 <Text style={styles.expandLabel}>내 재통역</Text>
                 <Text style={styles.expandText}>
                   {result.backInterpText || "인식된 텍스트 없음"}
