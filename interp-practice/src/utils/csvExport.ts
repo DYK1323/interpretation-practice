@@ -6,7 +6,7 @@ import { getAllSentences } from "../db/sentences";
 import { getStringSetting, setStringSetting } from "../db/settings";
 import type { SentenceEntry } from "../types";
 
-const HEADERS = "id,category,difficulty,englishText,koreanText,englishAudioType,koreanAudioType,englishAudioUri,koreanAudioUri,modelKorean,modelEnglish,tags";
+const HEADERS = "id,category,difficulty,englishText,koreanText,englishAudioType,koreanAudioType,englishAudioUri,koreanAudioUri,modelKorean,modelEnglish,tags,notes";
 
 function escape(val: string | undefined | null): string {
   if (!val) return "";
@@ -40,6 +40,7 @@ function entryToRow(e: SentenceEntry): string {
     escape(e.modelKorean),
     escape(e.modelEnglish),
     escape(e.tags.join("|")),
+    escape(e.notes),
   ].join(",");
 }
 

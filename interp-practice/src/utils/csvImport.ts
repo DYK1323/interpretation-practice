@@ -62,6 +62,7 @@ function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
     modelKorean,
     modelEnglish,
     tags,
+    notes: get("notes") || undefined,
   };
 }
 
