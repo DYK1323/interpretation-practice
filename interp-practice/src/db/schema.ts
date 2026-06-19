@@ -58,15 +58,9 @@ export async function initDB(): Promise<void> {
     );
   `);
 
-  // Migration v2: add notes column to sentences (existing installs)
-  const versionRow = await database.getFirstAsync<{ user_version: number }>(`PRAGMA user_version`);
-  const version = versionRow?.user_version ?? 0;
-  if (version < 2) {
-    try {
-      await database.execAsync(`ALTER TABLE sentences ADD COLUMN notes TEXT`);
-    } catch {
-      // Fresh install already has the column from CREATE TABLE above
-    }
-    await database.execAsync(`PRAGMA user_version = 2`);
+  // Migration: add notes column if it doesn't exist yet
+  const cols = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(sentences)`);
+  if (!cols.some(c => c.name === "notes")) {
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN notes TEXT`);
   }
 }

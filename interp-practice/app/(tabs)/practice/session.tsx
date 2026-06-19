@@ -73,7 +73,9 @@ export default function SessionScreen() {
   const sourceAudio =
     direction === "en-ko" ? s.englishAudio : s.koreanAudio;
   const modelInterp =
-    direction === "en-ko" ? s.modelKorean : s.modelEnglish;
+    direction === "en-ko"
+      ? (s.modelKorean ?? s.koreanText)
+      : (s.modelEnglish ?? s.englishText);
   if (!sourceText) return null;
 
   function advance() {

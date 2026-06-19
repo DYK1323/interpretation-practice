@@ -103,8 +103,8 @@ export default function SentenceDetail() {
         isNew ? "새 문장이 추가됐습니다." : "수정 내용이 저장됐습니다.",
         [{ text: "확인", onPress: () => { if (isNew) router.back(); } }]
       );
-    } catch {
-      Alert.alert("오류", "저장하는 중 오류가 발생했습니다.");
+    } catch (e: any) {
+      Alert.alert("오류", `저장 실패: ${e?.message ?? String(e)}`);
     } finally {
       setSaving(false);
     }
