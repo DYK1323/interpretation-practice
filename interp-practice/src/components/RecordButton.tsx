@@ -14,7 +14,7 @@ interface Props {
 }
 
 export function RecordButton({ onRecordingComplete, onRecordingStart }: Props) {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, directory: "document" });
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const pulse = useRef(new Animated.Value(1)).current;
