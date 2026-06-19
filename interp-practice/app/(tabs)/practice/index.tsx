@@ -96,7 +96,7 @@ export default function PracticeHome() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={{ fontSize: 10, color: "#9CA3AF", textAlign: "center", marginBottom: 4 }}>v3-test</Text>
+      <Text style={{ fontSize: 10, color: "#9CA3AF", textAlign: "center", marginBottom: 4 }}>v4-swap</Text>
       {/* 통계 */}
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
@@ -116,12 +116,6 @@ export default function PracticeHome() {
           <Text style={styles.statValue}>{stats.todayCount}</Text>
           <Text style={styles.statLabel}>오늘</Text>
         </View>
-      </View>
-
-      {/* 히트맵 */}
-      <View style={styles.heatmapSection}>
-        <Text style={styles.heatmapTitle}>최근 12주</Text>
-        <Heatmap data={heatmapData} weeks={12} />
       </View>
 
       {/* 오늘의 학습 큐 */}
@@ -191,6 +185,12 @@ export default function PracticeHome() {
             {totalCount === 0 ? "학습할 문장 없음" : `시작하기  ${totalCount}문장 →`}
           </Text>
         </TouchableOpacity>
+      </View>
+
+      {/* 히트맵 */}
+      <View style={styles.heatmapSection}>
+        <Text style={styles.heatmapTitle}>최근 12주</Text>
+        <Heatmap data={heatmapData} weeks={12} />
       </View>
     </ScrollView>
   );
