@@ -4,10 +4,8 @@ import type { SessionStep } from "../types";
 import { STEP_LABELS, getStepIndex } from "../features/session/sessionMachine";
 
 const STEPS: SessionStep[] = [
-  "LISTEN_SOURCE",
-  "RECORD_INTERP",
-  "PLAYBACK_INTERP",
-  "RECORD_BACK",
+  "LISTEN_RECORD",
+  "PLAYBACK_BACK",
   "COMPARE",
 ];
 

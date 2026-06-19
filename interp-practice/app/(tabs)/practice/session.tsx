@@ -12,7 +12,6 @@ import {
   AppState,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useAudioPlayer } from "expo-audio";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { StepIndicator } from "../../../src/components/StepIndicator";
 import { AudioPlayer } from "../../../src/components/AudioPlayer";
@@ -39,7 +38,6 @@ export default function SessionScreen() {
   const [sessionSaved, setSessionSaved] = useState(false);
   const appState = useRef(AppState.currentState);
 
-  // 다음 문장으로 넘어갈 때 로컬 상태 초기화
   useEffect(() => {
     setNotes("");
     setSessionSaved(false);
@@ -52,14 +50,9 @@ export default function SessionScreen() {
     }
     activateKeepAwakeAsync();
     loadSettings();
-
     const sub = AppState.addEventListener("change", (nextState) => {
-      if (appState.current === "active" && nextState !== "active") {
-        // App backgrounded during recording — stop will be handled by OS
-      }
       appState.current = nextState;
     });
-
     return () => {
       deactivateKeepAwake();
       sub.remove();
@@ -72,17 +65,14 @@ export default function SessionScreen() {
   }
 
   if (!sentence) return null;
-  const s = sentence; // non-null alias for use in closures
+  const s = sentence;
 
-  const sourceText =
-    direction === "en-ko" ? s.englishText : s.koreanText ?? "";
+  const sourceText = direction === "en-ko" ? s.englishText : s.koreanText ?? "";
   const sourceLang = direction === "en-ko" ? "en-US" : "ko-KR";
-  const sourceAudio =
-    direction === "en-ko" ? s.englishAudio : s.koreanAudio;
-  const modelInterp =
-    direction === "en-ko"
-      ? (s.modelKorean ?? s.koreanText)
-      : (s.modelEnglish ?? s.englishText);
+  const sourceAudio = direction === "en-ko" ? s.englishAudio : s.koreanAudio;
+  const modelInterp = direction === "en-ko"
+    ? (s.modelKorean ?? s.koreanText)
+    : (s.modelEnglish ?? s.englishText);
   if (!sourceText) return null;
 
   function advance() {
@@ -90,16 +80,16 @@ export default function SessionScreen() {
     if (next) setStep(next);
   }
 
-  function handleRecordInterpComplete(uri: string) {
+  function handleInterpComplete(uri: string) {
     setInterpRecordingUri(uri);
     advance();
   }
 
-  function handleRecordBackStart() {
+  function handleBackStart() {
     startListening();
   }
 
-  function handleRecordBackComplete(uri: string) {
+  function handleBackComplete(uri: string) {
     const finalText = stopListening();
     setBackInterpText(finalText || transcript);
     advance();
@@ -108,22 +98,19 @@ export default function SessionScreen() {
   async function handleScheduleReview(days: number, difficulty: 1 | 2 | 3) {
     if (sessionSaved) return;
     setSessionSaved(true);
-
     const result = {
       id: `${s.id}_${direction}_${Date.now()}`,
       sentenceId: s.id,
       direction,
       timestamp: Date.now(),
       interpRecordingUri: interpRecordingUri ?? undefined,
-      backInterpText: backInterpText,
+      backInterpText,
       originalText: sourceText,
       notes: notes.trim() || undefined,
     };
-
     await saveResult(result);
     await scheduleReview(s.id, direction, days);
     await updateSentenceDifficulty(s.id, difficulty);
-
     const hasNext = advanceQueue();
     if (!hasNext) {
       const total = queue.length;
@@ -135,7 +122,7 @@ export default function SessionScreen() {
   }
 
   function handleRetry() {
-    setStep("LISTEN_SOURCE");
+    setStep("LISTEN_RECORD");
     setInterpRecordingUri("");
     setBackInterpText("");
     setNotes("");
@@ -148,10 +135,7 @@ export default function SessionScreen() {
       {
         text: "종료",
         style: "destructive",
-        onPress: () => {
-          reset();
-          router.replace("/practice");
-        },
+        onPress: () => { reset(); router.replace("/practice"); },
       },
     ]);
   }
@@ -174,7 +158,8 @@ export default function SessionScreen() {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        {step === "LISTEN_SOURCE" && (
+
+        {step === "LISTEN_RECORD" && (
           <View style={styles.stepContent}>
             <Text style={styles.stepDesc}>{stepDesc}</Text>
             {showSourceText && (
@@ -189,43 +174,26 @@ export default function SessionScreen() {
                   : { type: "tts", text: sourceText, language: sourceLang }
               }
             />
-            <TouchableOpacity style={styles.primaryBtn} onPress={advance}>
-              <Text style={styles.primaryBtnText}>통역 준비됐어요 →</Text>
-            </TouchableOpacity>
+            <View style={styles.divider} />
+            <Text style={styles.subLabel}>준비되면 통역을 녹음하세요</Text>
+            <RecordButton onRecordingComplete={handleInterpComplete} />
           </View>
         )}
 
-        {step === "RECORD_INTERP" && (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepDesc}>{stepDesc}</Text>
-            <RecordButton
-              onRecordingComplete={handleRecordInterpComplete}
-              onRecordingStart={() => {}}
-            />
-          </View>
-        )}
-
-        {step === "PLAYBACK_INTERP" && interpRecordingUri && (
+        {step === "PLAYBACK_BACK" && interpRecordingUri && (
           <View style={styles.stepContent}>
             <Text style={styles.stepDesc}>{stepDesc}</Text>
             <AudioPlayer source={{ type: "file", uri: interpRecordingUri }} />
-            <TouchableOpacity style={styles.primaryBtn} onPress={advance}>
-              <Text style={styles.primaryBtnText}>재통역 준비됐어요 →</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {step === "RECORD_BACK" && (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepDesc}>{stepDesc}</Text>
+            <View style={styles.divider} />
+            <Text style={styles.subLabel}>준비되면 재통역을 녹음하세요</Text>
             {isListening && transcript ? (
               <View style={styles.liveTranscript}>
                 <Text style={styles.liveTranscriptText}>{transcript}</Text>
               </View>
             ) : null}
             <RecordButton
-              onRecordingStart={handleRecordBackStart}
-              onRecordingComplete={handleRecordBackComplete}
+              onRecordingStart={handleBackStart}
+              onRecordingComplete={handleBackComplete}
             />
           </View>
         )}
@@ -238,7 +206,6 @@ export default function SessionScreen() {
               direction={direction}
               modelInterpretation={modelInterp}
             />
-
             <View style={styles.notesSection}>
               <Text style={styles.notesLabel}>메모</Text>
               <TextInput
@@ -250,7 +217,6 @@ export default function SessionScreen() {
                 onChangeText={setNotes}
               />
             </View>
-
             <View style={styles.reviewSection}>
               <Text style={styles.reviewLabel}>이 문장 얼마나 어려웠나요?</Text>
               <View style={styles.difficultyRow}>
@@ -272,7 +238,6 @@ export default function SessionScreen() {
                 ))}
               </View>
             </View>
-
             <View style={styles.actionRow}>
               <TouchableOpacity style={styles.secondaryBtn} onPress={handleRetry}>
                 <Text style={styles.secondaryBtnText}>다시 연습</Text>
@@ -287,132 +252,34 @@ export default function SessionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-    paddingTop: 8,
-  },
-  exitBtn: {
-    position: "absolute",
-    top: 12,
-    right: 16,
-    zIndex: 10,
-    padding: 4,
-  },
+  header: { borderBottomWidth: 1, borderBottomColor: "#F3F4F6", paddingTop: 8 },
+  exitBtn: { position: "absolute", top: 12, right: 16, zIndex: 10, padding: 4 },
   exitText: { fontSize: 18, color: "#9CA3AF" },
-  queueCounter: {
-    position: "absolute",
-    top: 14,
-    left: 16,
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#6B7280",
-  },
+  queueCounter: { position: "absolute", top: 14, left: 16, fontSize: 13, fontWeight: "600", color: "#6B7280" },
   body: { flex: 1 },
-  bodyContent: {
-    flexGrow: 1,
-    padding: 24,
-  },
-  stepContent: {
-    flex: 1,
-    alignItems: "center",
-    gap: 32,
-    paddingTop: 32,
-  },
-  stepDesc: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#111827",
-    textAlign: "center",
-  },
-  textBox: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    padding: 20,
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  sourceText: {
-    fontSize: 18,
-    lineHeight: 28,
-    color: "#111827",
-    textAlign: "center",
-  },
-  primaryBtn: {
-    backgroundColor: "#1A56DB",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    width: "100%",
-    alignItems: "center",
-  },
-  primaryBtnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
-  liveTranscript: {
-    backgroundColor: "#F0F9FF",
-    borderRadius: 12,
-    padding: 16,
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#BAE6FD",
-  },
+  bodyContent: { flexGrow: 1, padding: 24 },
+  stepContent: { flex: 1, alignItems: "center", gap: 20, paddingTop: 24 },
+  stepDesc: { fontSize: 20, fontWeight: "600", color: "#111827", textAlign: "center" },
+  textBox: { backgroundColor: "#F9FAFB", borderRadius: 12, padding: 20, width: "100%", borderWidth: 1, borderColor: "#E5E7EB" },
+  sourceText: { fontSize: 18, lineHeight: 28, color: "#111827", textAlign: "center" },
+  divider: { width: "100%", height: 1, backgroundColor: "#F3F4F6", marginVertical: 4 },
+  subLabel: { fontSize: 13, color: "#9CA3AF" },
+  liveTranscript: { backgroundColor: "#F0F9FF", borderRadius: 12, padding: 16, width: "100%", borderWidth: 1, borderColor: "#BAE6FD" },
   liveTranscriptText: { fontSize: 15, color: "#0369A1", lineHeight: 22 },
   compareContainer: { flex: 1, gap: 0 },
   notesSection: { marginTop: 16 },
-  notesLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#6B7280",
-    marginBottom: 8,
-  },
-  notesInput: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    color: "#111827",
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
+  notesLabel: { fontSize: 13, fontWeight: "600", color: "#6B7280", marginBottom: 8 },
+  notesInput: { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, padding: 12, fontSize: 15, color: "#111827", minHeight: 80, textAlignVertical: "top" },
   reviewSection: { marginTop: 20 },
-  reviewLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  difficultyRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  difficultyBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    alignItems: "center",
-    gap: 4,
-    borderWidth: 1,
-  },
+  reviewLabel: { fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 12, textAlign: "center" },
+  difficultyRow: { flexDirection: "row", gap: 8 },
+  difficultyBtn: { flex: 1, paddingVertical: 14, paddingHorizontal: 8, borderRadius: 12, alignItems: "center", gap: 4, borderWidth: 1 },
   diffHard: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
   diffMed:  { backgroundColor: "#FFFBEB", borderColor: "#FDE68A" },
   diffEasy: { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" },
   difficultyStars: { fontSize: 13, fontWeight: "700", color: "#374151" },
   difficultySublabel: { fontSize: 11, color: "#6B7280" },
-  actionRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 16,
-    justifyContent: "center",
-  },
-  secondaryBtn: {
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
-  },
+  actionRow: { flexDirection: "row", gap: 12, marginTop: 16, justifyContent: "center" },
+  secondaryBtn: { paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12, borderWidth: 2, borderColor: "#E5E7EB" },
   secondaryBtnText: { fontSize: 15, fontWeight: "600", color: "#374151" },
 });

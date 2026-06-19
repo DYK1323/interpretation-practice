@@ -52,17 +52,13 @@ export const DEFAULT_SETTINGS: UserSettings = {
 };
 
 export type SessionStep =
-  | "LISTEN_SOURCE"
-  | "RECORD_INTERP"
-  | "PLAYBACK_INTERP"
-  | "RECORD_BACK"
+  | "LISTEN_RECORD"
+  | "PLAYBACK_BACK"
   | "COMPARE";
 
 export const SESSION_STEPS: SessionStep[] = [
-  "LISTEN_SOURCE",
-  "RECORD_INTERP",
-  "PLAYBACK_INTERP",
-  "RECORD_BACK",
+  "LISTEN_RECORD",
+  "PLAYBACK_BACK",
   "COMPARE",
 ];
 

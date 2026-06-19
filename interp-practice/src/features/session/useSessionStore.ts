@@ -30,7 +30,7 @@ interface SessionState {
 }
 
 const INITIAL_STEP_STATE = {
-  step: "LISTEN_SOURCE" as SessionStep,
+  step: "LISTEN_RECORD" as SessionStep,
   interpRecordingUri: null,
   backInterpText: "",
   isPlaying: false,

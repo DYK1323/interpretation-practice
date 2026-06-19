@@ -122,20 +122,6 @@ export default function PracticeHome() {
       <View style={styles.queueCard}>
         <Text style={styles.queueTitle}>오늘의 학습</Text>
 
-        <View style={styles.queueSummary}>
-          <View style={styles.queueBadge}>
-            <Text style={styles.queueBadgeNum}>{dueCount}</Text>
-            <Text style={styles.queueBadgeLabel}>복습</Text>
-          </View>
-          <Text style={styles.queuePlus}>+</Text>
-          <View style={[styles.queueBadge, styles.queueBadgeNew]}>
-            <Text style={[styles.queueBadgeNum, styles.queueBadgeNumNew]}>{newCount}</Text>
-            <Text style={[styles.queueBadgeLabel, styles.queueBadgeLabelNew]}>새 문장</Text>
-          </View>
-          <Text style={styles.queueEquals}>=</Text>
-          <Text style={styles.queueTotal}>{totalCount}문장</Text>
-        </View>
-
         {/* 새 문장 필터 */}
         <View style={styles.filterSection}>
           <Text style={styles.filterLabel}>새 문장 방향</Text>
