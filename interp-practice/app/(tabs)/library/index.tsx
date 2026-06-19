@@ -7,6 +7,8 @@ import {
   FlatList,
   Alert,
   ActivityIndicator,
+  ToastAndroid,
+  Platform,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { File, Paths } from "expo-file-system";
@@ -44,6 +46,7 @@ export default function LibraryIndex() {
     const file = new File(Paths.cache, "template.csv");
     file.write(template);
     await Sharing.shareAsync(file.uri, { mimeType: "text/csv", dialogTitle: "CSV 양식 저장" });
+    if (Platform.OS === "android") ToastAndroid.show("공유 완료", ToastAndroid.SHORT);
   }
 
   async function handleImport() {
@@ -51,10 +54,17 @@ export default function LibraryIndex() {
     try {
       const { imported, failed } = await importCSV();
       await load();
-      Alert.alert(
-        "가져오기 완료",
-        `${imported}개 문장을 가져왔습니다.${failed > 0 ? ` (${failed}개 실패)` : ""}`
-      );
+      if (Platform.OS === "android") {
+        ToastAndroid.show(
+          `${imported}개 문장 가져오기 완료${failed > 0 ? ` (${failed}개 실패)` : ""}`,
+          ToastAndroid.LONG
+        );
+      } else {
+        Alert.alert(
+          "가져오기 완료",
+          `${imported}개 문장을 가져왔습니다.${failed > 0 ? ` (${failed}개 실패)` : ""}`
+        );
+      }
     } catch (e) {
       Alert.alert("오류", "CSV 파일을 처리하는 중 오류가 발생했습니다.");
     } finally {

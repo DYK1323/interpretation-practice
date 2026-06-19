@@ -9,6 +9,8 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  ToastAndroid,
+  Platform,
 } from "react-native";
 import { getAllSettings, setSetting, getStringSetting, setStringSetting } from "../../src/db/settings";
 import { syncFromSheetUrl } from "../../src/utils/csvImport";
@@ -69,7 +71,11 @@ export default function SettingsScreen() {
     setExporting(true);
     try {
       const count = await exportCSV();
-      if (count === 0) Alert.alert("내보낼 문장 없음", "라이브러리에 문장을 추가하세요.");
+      if (count === 0) {
+        Alert.alert("내보낼 문장 없음", "라이브러리에 문장을 추가하세요.");
+      } else if (Platform.OS === "android") {
+        ToastAndroid.show(`${count}개 문장 내보내기 완료`, ToastAndroid.SHORT);
+      }
     } catch (e: any) {
       Alert.alert("내보내기 실패", e?.message ?? "알 수 없는 오류");
     } finally {
@@ -123,6 +129,7 @@ export default function SettingsScreen() {
             : <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>CSV 내보내기</Text>
           }
         </TouchableOpacity>
+        <Text style={styles.hint}>공유 창에서 구글 드라이브를 선택하세요</Text>
       </View>
 
       {/* 연습 설정 */}
@@ -210,6 +217,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   desc: { fontSize: 13, color: "#6B7280", lineHeight: 19 },
+  hint: { fontSize: 12, color: "#9CA3AF", textAlign: "center" },
   urlInput: {
     borderWidth: 1,
     borderColor: "#E5E7EB",
