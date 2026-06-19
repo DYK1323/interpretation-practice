@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -9,8 +9,10 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
-  ToastAndroid,
+  Modal,
+  KeyboardAvoidingView,
   Platform,
+  ToastAndroid,
 } from "react-native";
 import { getAllSettings, setSetting, getStringSetting, setStringSetting } from "../../src/db/settings";
 import { syncFromSheetUrl } from "../../src/utils/csvImport";
@@ -24,11 +26,16 @@ const SPEEDS = [
   { value: 1.25 as const, label: "1.25x (빠르게)" },
 ];
 
+const PRESET_LIMITS = [10, 20, 30];
+
 export default function SettingsScreen() {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [sheetUrl, setSheetUrl] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [limitModalVisible, setLimitModalVisible] = useState(false);
+  const [limitInput, setLimitInput] = useState("");
+  const limitInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     loadSettings();
@@ -44,6 +51,17 @@ export default function SettingsScreen() {
   async function updateSetting<K extends keyof UserSettings>(key: K, value: UserSettings[K]) {
     await setSetting(key, value);
     setSettings((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleCustomLimit() {
+    const n = parseInt(limitInput, 10);
+    if (!n || n < 1 || n > 999) {
+      Alert.alert("올바른 숫자를 입력하세요 (1~999)");
+      return;
+    }
+    updateSetting("dailyNewLimit", n);
+    setLimitModalVisible(false);
+    setLimitInput("");
   }
 
   async function handleSync() {
@@ -169,7 +187,7 @@ export default function SettingsScreen() {
           <Text style={styles.rowTitle}>하루 새 문장 수</Text>
           <Text style={styles.rowDesc}>복습 문장 외에 추가할 새 문장의 최대 개수입니다.</Text>
           <View style={styles.chipRow}>
-            {[5, 10, 15, 20, 30, 50].map((n) => (
+            {PRESET_LIMITS.map((n) => (
               <TouchableOpacity
                 key={n}
                 style={[styles.chip, settings.dailyNewLimit === n && styles.chipActive]}
@@ -180,6 +198,24 @@ export default function SettingsScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
+            <TouchableOpacity
+              style={[
+                styles.chip,
+                !PRESET_LIMITS.includes(settings.dailyNewLimit) && styles.chipActive,
+              ]}
+              onPress={() => {
+                setLimitInput(String(settings.dailyNewLimit));
+                setLimitModalVisible(true);
+                setTimeout(() => limitInputRef.current?.focus(), 100);
+              }}
+            >
+              <Text style={[
+                styles.chipText,
+                !PRESET_LIMITS.includes(settings.dailyNewLimit) && styles.chipTextActive,
+              ]}>
+                {PRESET_LIMITS.includes(settings.dailyNewLimit) ? "기타" : `${settings.dailyNewLimit}개`}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -225,6 +261,43 @@ export default function SettingsScreen() {
         </View>
       </View>
     </ScrollView>
+
+      <Modal
+        visible={limitModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLimitModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>하루 새 문장 수</Text>
+            <TextInput
+              ref={limitInputRef}
+              style={styles.modalInput}
+              keyboardType="number-pad"
+              value={limitInput}
+              onChangeText={setLimitInput}
+              placeholder="개수 입력"
+              placeholderTextColor="#9CA3AF"
+              onSubmitEditing={handleCustomLimit}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => { setLimitModalVisible(false); setLimitInput(""); }}
+              >
+                <Text style={styles.modalCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleCustomLimit}>
+                <Text style={styles.modalConfirmText}>확인</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
   );
 }
 
@@ -312,6 +385,47 @@ const styles = StyleSheet.create({
     backgroundColor: "#1A56DB",
   },
   radioLabel: { fontSize: 15, color: "#374151" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 24,
+    width: 280,
+    gap: 16,
+  },
+  modalTitle: { fontSize: 16, fontWeight: "700", color: "#111827", textAlign: "center" },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 20,
+    textAlign: "center",
+    color: "#111827",
+  },
+  modalButtons: { flexDirection: "row", gap: 10 },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+  },
+  modalCancelText: { fontSize: 15, color: "#6B7280", fontWeight: "600" },
+  modalConfirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: "#1A56DB",
+    alignItems: "center",
+  },
+  modalConfirmText: { fontSize: 15, color: "#FFFFFF", fontWeight: "600" },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
