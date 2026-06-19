@@ -60,18 +60,22 @@ export async function getSentenceById(id: string): Promise<SentenceEntry | null>
   return row ? rowToEntry(row) : null;
 }
 
-export async function upsertSentence(entry: SentenceEntry): Promise<void> {
+export async function upsertSentence(entry: SentenceEntry, opts?: { keepDifficulty?: boolean }): Promise<void> {
   const db = await getDB();
+  // When keepDifficulty=true (CSV import without difficulty column):
+  //   INSERT: COALESCE(null, 2) = 2 (default for new sentences)
+  //   UPDATE: COALESCE(null, existing) = keeps practiced difficulty
+  const diffParam = opts?.keepDifficulty ? null : entry.difficulty;
   await db.runAsync(
     `INSERT INTO sentences (
       id, category, difficulty, english_text, korean_text,
       english_audio_type, english_audio_uri,
       korean_audio_type, korean_audio_uri,
       model_korean, model_english, tags, duration_seconds, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, COALESCE(?, 2), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       category = excluded.category,
-      difficulty = excluded.difficulty,
+      difficulty = COALESCE(excluded.difficulty, sentences.difficulty),
       english_text = excluded.english_text,
       korean_text = excluded.korean_text,
       english_audio_type = excluded.english_audio_type,
@@ -86,7 +90,7 @@ export async function upsertSentence(entry: SentenceEntry): Promise<void> {
     [
       entry.id,
       entry.category,
-      entry.difficulty,
+      diffParam,
       entry.englishText,
       entry.koreanText ?? null,
       entry.englishAudio?.type ?? "tts",

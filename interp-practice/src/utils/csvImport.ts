@@ -92,7 +92,7 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
     const entry = rowToEntry(cols, headers);
     if (entry) {
       try {
-        await upsertSentence(entry);
+        await upsertSentence(entry, { keepDifficulty: !headers.includes("difficulty") });
         imported++;
       } catch {
         failed++;
