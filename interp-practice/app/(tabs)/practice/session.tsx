@@ -30,13 +30,20 @@ import { DIFFICULTY_OPTIONS } from "../../../src/types";
 
 export default function SessionScreen() {
   const router = useRouter();
-  const { sentence, direction, step, interpRecordingUri, backInterpText, setStep, setInterpRecordingUri, setBackInterpText, reset } =
-    useSessionStore();
+  const { sentence, direction, step, interpRecordingUri, backInterpText,
+    queue, queueIndex, setStep, setInterpRecordingUri, setBackInterpText,
+    advanceQueue, reset } = useSessionStore();
   const { transcript, isListening, startListening, stopListening } = useSTT(direction);
   const [notes, setNotes] = useState("");
   const [showSourceText, setShowSourceText] = useState(false);
   const [sessionSaved, setSessionSaved] = useState(false);
   const appState = useRef(AppState.currentState);
+
+  // 다음 문장으로 넘어갈 때 로컬 상태 초기화
+  useEffect(() => {
+    setNotes("");
+    setSessionSaved(false);
+  }, [sentence?.id, direction]);
 
   useEffect(() => {
     if (!sentence) {
@@ -116,7 +123,15 @@ export default function SessionScreen() {
     await saveResult(result);
     await scheduleReview(s.id, direction, days);
     await updateSentenceDifficulty(s.id, difficulty);
-    router.replace("/practice");
+
+    const hasNext = advanceQueue();
+    if (!hasNext) {
+      const total = queue.length;
+      reset();
+      Alert.alert("완료!", `${total}문장 학습 완료 🎉`, [
+        { text: "확인", onPress: () => router.replace("/practice") },
+      ]);
+    }
   }
 
   function handleRetry() {
@@ -152,6 +167,9 @@ export default function SessionScreen() {
         <TouchableOpacity onPress={handleExit} style={styles.exitBtn}>
           <Text style={styles.exitText}>✕</Text>
         </TouchableOpacity>
+        {queue.length > 1 && (
+          <Text style={styles.queueCounter}>{queueIndex + 1} / {queue.length}</Text>
+        )}
         <StepIndicator currentStep={step} />
       </View>
 
@@ -282,6 +300,14 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   exitText: { fontSize: 18, color: "#9CA3AF" },
+  queueCounter: {
+    position: "absolute",
+    top: 14,
+    left: 16,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
   body: { flex: 1 },
   bodyContent: {
     flexGrow: 1,

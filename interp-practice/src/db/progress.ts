@@ -1,5 +1,5 @@
 import { getDB } from "./schema";
-import type { SentenceProgress, Direction } from "../types";
+import type { SentenceEntry, SentenceProgress, Direction, Category } from "../types";
 
 function rowToProgress(row: any): SentenceProgress {
   return {
@@ -19,6 +19,86 @@ export async function getDueForReview(now: number = Date.now()): Promise<Sentenc
     [now]
   );
   return rows.map(rowToProgress);
+}
+
+export async function getDueWithSentences(
+  now: number = Date.now()
+): Promise<Array<{ sentence: SentenceEntry; direction: Direction }>> {
+  const db = await getDB();
+  const rows = await db.getAllAsync<any>(
+    `SELECT s.*, sp.direction as sp_direction
+     FROM sentence_progress sp
+     JOIN sentences s ON s.id = sp.sentence_id
+     WHERE sp.next_review_date <= ?
+     ORDER BY sp.next_review_date ASC`,
+    [now]
+  );
+  return rows.map((row) => ({
+    direction: row.sp_direction as Direction,
+    sentence: {
+      id: row.id,
+      category: row.category,
+      difficulty: row.difficulty,
+      englishText: row.english_text,
+      koreanText: row.korean_text ?? undefined,
+      englishAudio: row.english_audio_type === "file"
+        ? { type: "file" as const, uri: row.english_audio_uri }
+        : { type: "tts" as const },
+      koreanAudio: row.korean_audio_type === "file"
+        ? { type: "file" as const, uri: row.korean_audio_uri }
+        : { type: "tts" as const },
+      modelKorean: row.model_korean ?? undefined,
+      modelEnglish: row.model_english ?? undefined,
+      tags: JSON.parse(row.tags ?? "[]"),
+      durationSeconds: row.duration_seconds ?? undefined,
+      notes: row.notes ?? undefined,
+    } as SentenceEntry,
+  }));
+}
+
+export async function getNewSentences(
+  direction: Direction,
+  category: Category | null,
+  limit: number = 10
+): Promise<SentenceEntry[]> {
+  const db = await getDB();
+  const params: any[] = [direction];
+  let filter = "";
+  if (category) {
+    filter += " AND s.category = ?";
+    params.push(category);
+  }
+  if (direction === "ko-en") {
+    filter += " AND s.korean_text IS NOT NULL";
+  }
+  params.push(limit);
+
+  const rows = await db.getAllAsync<any>(
+    `SELECT s.* FROM sentences s
+     LEFT JOIN sentence_progress sp ON s.id = sp.sentence_id AND sp.direction = ?
+     WHERE sp.sentence_id IS NULL${filter}
+     ORDER BY s.difficulty ASC, s.id ASC
+     LIMIT ?`,
+    params
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    category: row.category,
+    difficulty: row.difficulty,
+    englishText: row.english_text,
+    koreanText: row.korean_text ?? undefined,
+    englishAudio: row.english_audio_type === "file"
+      ? { type: "file" as const, uri: row.english_audio_uri }
+      : { type: "tts" as const },
+    koreanAudio: row.korean_audio_type === "file"
+      ? { type: "file" as const, uri: row.korean_audio_uri }
+      : { type: "tts" as const },
+    modelKorean: row.model_korean ?? undefined,
+    modelEnglish: row.model_english ?? undefined,
+    tags: JSON.parse(row.tags ?? "[]"),
+    durationSeconds: row.duration_seconds ?? undefined,
+    notes: row.notes ?? undefined,
+  } as SentenceEntry));
 }
 
 export async function getProgress(

@@ -1,82 +1,90 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { getDueForReview } from "../../../src/db/progress";
-import { getSentenceById, getAllSentences } from "../../../src/db/sentences";
+import { getDueWithSentences, getNewSentences } from "../../../src/db/progress";
 import { getHeatmapData, getStats } from "../../../src/db/results";
 import { useSessionStore } from "../../../src/features/session/useSessionStore";
 import { Heatmap } from "../../../src/components/Heatmap";
-import type { SentenceEntry, Direction, SentenceProgress, Category } from "../../../src/types";
+import type { Direction, Category } from "../../../src/types";
+import type { QueueItem } from "../../../src/features/session/useSessionStore";
 
 const CATEGORIES: { key: Category; label: string }[] = [
-  { key: "news", label: "뉴스" },
-  { key: "business", label: "비즈니스" },
+  { key: "news",        label: "뉴스" },
+  { key: "business",   label: "비즈니스" },
   { key: "conference", label: "회의/강연" },
-  { key: "daily", label: "일상" },
+  { key: "daily",      label: "일상" },
 ];
 
-const DIFFICULTIES = [
-  { key: 1 as const, label: "★☆☆" },
-  { key: 2 as const, label: "★★☆" },
-  { key: 3 as const, label: "★★★" },
-];
+const NEW_SENTENCE_LIMIT = 10;
 
 export default function PracticeHome() {
   const router = useRouter();
-  const { startSession } = useSessionStore();
+  const { startQueue } = useSessionStore();
 
   const [direction, setDirection] = useState<Direction>("en-ko");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<1 | 2 | 3 | null>(null);
-  const [dueItems, setDueItems] = useState<Array<{ progress: SentenceProgress; sentence: SentenceEntry | null }>>([]);
-  const [allSentences, setAllSentences] = useState<SentenceEntry[]>([]);
+  const [dueCount, setDueCount] = useState(0);
+  const [newCount, setNewCount] = useState(0);
   const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
   const [stats, setStats] = useState({ streak: 0, totalSentences: 0, todayCount: 0 });
   const [loading, setLoading] = useState(true);
+  const [queueCache, setQueueCache] = useState<{
+    due: QueueItem[];
+    newItems: QueueItem[];
+  }>({ due: [], newItems: [] });
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [])
+    }, [direction, selectedCategory])
   );
 
   async function loadData() {
     setLoading(true);
-    const [due, sentences, heatmap, statsData] = await Promise.all([
-      getDueForReview(),
-      getAllSentences(),
+    const [due, newSentences, heatmap, statsData] = await Promise.all([
+      getDueWithSentences(),
+      getNewSentences(direction, selectedCategory, NEW_SENTENCE_LIMIT),
       getHeatmapData(84),
       getStats(),
     ]);
-    const dueWithSentences = await Promise.all(
-      due.map(async (p) => ({ progress: p, sentence: await getSentenceById(p.sentenceId) }))
-    );
-    setDueItems(dueWithSentences.filter((d) => d.sentence !== null));
-    setAllSentences(sentences);
+
+    const dueItems: QueueItem[] = due.map((d) => ({ sentence: d.sentence, direction: d.direction }));
+    const newItems: QueueItem[] = newSentences.map((s) => ({ sentence: s, direction }));
+
+    setDueCount(dueItems.length);
+    setNewCount(newItems.length);
+    setQueueCache({ due: dueItems, newItems });
     setHeatmapData(heatmap);
     setStats(statsData);
     setLoading(false);
   }
 
-  const filteredSentences = allSentences.filter((s) => {
-    if (direction === "ko-en" && !s.koreanText) return false;
-    if (selectedCategory && s.category !== selectedCategory) return false;
-    if (selectedDifficulty && s.difficulty !== selectedDifficulty) return false;
-    return true;
-  });
+  // Reload new sentence count when filters change without full reload
+  useFocusEffect(
+    useCallback(() => {
+      // Already handled by the main loadData above (it runs on direction/category change)
+    }, [])
+  );
 
-  function handleStartSession(sentence: SentenceEntry, dir: Direction = direction) {
-    startSession(sentence, dir);
+  function handleStart() {
+    const queue = [...queueCache.due, ...queueCache.newItems];
+    if (queue.length === 0) {
+      Alert.alert("학습할 문장 없음", "라이브러리에 문장을 추가하거나 복습 일정이 돌아올 때까지 기다려주세요.");
+      return;
+    }
+    startQueue(queue);
     router.push("/practice/session");
   }
+
+  const totalCount = dueCount + newCount;
 
   if (loading) {
     return (
@@ -88,6 +96,7 @@ export default function PracticeHome() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* 통계 */}
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
           <Text style={styles.statEmoji}>🔥</Text>
@@ -108,126 +117,79 @@ export default function PracticeHome() {
         </View>
       </View>
 
+      {/* 히트맵 */}
       <View style={styles.heatmapSection}>
         <Text style={styles.heatmapTitle}>최근 12주</Text>
         <Heatmap data={heatmapData} weeks={12} />
       </View>
 
-      {dueItems.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>오늘의 복습 ({dueItems.length})</Text>
-          {dueItems.slice(0, 5).map(({ progress, sentence }) =>
-            sentence ? (
-              <TouchableOpacity
-                key={`${progress.sentenceId}-${progress.direction}`}
-                style={styles.reviewCard}
-                onPress={() => handleStartSession(sentence, progress.direction)}
-              >
-                <View style={styles.reviewCardLeft}>
-                  <Text style={styles.directionBadge}>
-                    {progress.direction === "en-ko" ? "영→한" : "한→영"}
-                  </Text>
-                  <Text style={styles.reviewText} numberOfLines={2}>
-                    {progress.direction === "en-ko" ? sentence.englishText : sentence.koreanText}
-                  </Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </TouchableOpacity>
-            ) : null
-          )}
-          {dueItems.length > 5 && (
-            <Text style={styles.moreText}>+{dueItems.length - 5}개 더</Text>
-          )}
-        </View>
-      )}
+      {/* 오늘의 학습 큐 */}
+      <View style={styles.queueCard}>
+        <Text style={styles.queueTitle}>오늘의 학습</Text>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>새 문장 연습</Text>
-
-        <Text style={styles.filterLabel}>방향</Text>
-        <View style={styles.row}>
-          {(["en-ko", "ko-en"] as Direction[]).map((d) => (
-            <TouchableOpacity
-              key={d}
-              style={[styles.chip, direction === d && styles.chipActive]}
-              onPress={() => setDirection(d)}
-            >
-              <Text style={[styles.chipText, direction === d && styles.chipTextActive]}>
-                {d === "en-ko" ? "영→한" : "한→영"}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={styles.filterLabel}>카테고리</Text>
-        <View style={styles.row}>
-          <TouchableOpacity
-            style={[styles.chip, !selectedCategory && styles.chipActive]}
-            onPress={() => setSelectedCategory(null)}
-          >
-            <Text style={[styles.chipText, !selectedCategory && styles.chipTextActive]}>전체</Text>
-          </TouchableOpacity>
-          {CATEGORIES.map((c) => (
-            <TouchableOpacity
-              key={c.key}
-              style={[styles.chip, selectedCategory === c.key && styles.chipActive]}
-              onPress={() => setSelectedCategory(c.key)}
-            >
-              <Text style={[styles.chipText, selectedCategory === c.key && styles.chipTextActive]}>
-                {c.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={styles.filterLabel}>난이도</Text>
-        <View style={styles.row}>
-          <TouchableOpacity
-            style={[styles.chip, !selectedDifficulty && styles.chipActive]}
-            onPress={() => setSelectedDifficulty(null)}
-          >
-            <Text style={[styles.chipText, !selectedDifficulty && styles.chipTextActive]}>전체</Text>
-          </TouchableOpacity>
-          {DIFFICULTIES.map((d) => (
-            <TouchableOpacity
-              key={d.key}
-              style={[styles.chip, selectedDifficulty === d.key && styles.chipActive]}
-              onPress={() => setSelectedDifficulty(d.key)}
-            >
-              <Text style={[styles.chipText, selectedDifficulty === d.key && styles.chipTextActive]}>
-                {d.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {filteredSentences.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>
-              {allSentences.length === 0
-                ? "라이브러리에 문장을 추가해주세요."
-                : "해당 조건의 문장이 없습니다."}
-            </Text>
+        <View style={styles.queueSummary}>
+          <View style={styles.queueBadge}>
+            <Text style={styles.queueBadgeNum}>{dueCount}</Text>
+            <Text style={styles.queueBadgeLabel}>복습</Text>
           </View>
-        ) : (
-          filteredSentences.map((sentence) => (
-            <TouchableOpacity
-              key={sentence.id}
-              style={styles.sentenceCard}
-              onPress={() => handleStartSession(sentence)}
-            >
-              <View style={styles.sentenceCardMeta}>
-                <Text style={styles.categoryBadge}>{sentence.category}</Text>
-                <Text style={styles.difficultyText}>
-                  {"★".repeat(sentence.difficulty) + "☆".repeat(3 - sentence.difficulty)}
+          <Text style={styles.queuePlus}>+</Text>
+          <View style={[styles.queueBadge, styles.queueBadgeNew]}>
+            <Text style={[styles.queueBadgeNum, styles.queueBadgeNumNew]}>{newCount}</Text>
+            <Text style={[styles.queueBadgeLabel, styles.queueBadgeLabelNew]}>새 문장</Text>
+          </View>
+          <Text style={styles.queueEquals}>=</Text>
+          <Text style={styles.queueTotal}>{totalCount}문장</Text>
+        </View>
+
+        {/* 새 문장 필터 */}
+        <View style={styles.filterSection}>
+          <Text style={styles.filterLabel}>새 문장 방향</Text>
+          <View style={styles.chipRow}>
+            {(["en-ko", "ko-en"] as Direction[]).map((d) => (
+              <TouchableOpacity
+                key={d}
+                style={[styles.chip, direction === d && styles.chipActive]}
+                onPress={() => setDirection(d)}
+              >
+                <Text style={[styles.chipText, direction === d && styles.chipTextActive]}>
+                  {d === "en-ko" ? "영→한" : "한→영"}
                 </Text>
-              </View>
-              <Text style={styles.sentenceText} numberOfLines={2}>
-                {direction === "en-ko" ? sentence.englishText : sentence.koreanText}
-              </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.filterLabel}>카테고리</Text>
+          <View style={styles.chipRow}>
+            <TouchableOpacity
+              style={[styles.chip, !selectedCategory && styles.chipActive]}
+              onPress={() => setSelectedCategory(null)}
+            >
+              <Text style={[styles.chipText, !selectedCategory && styles.chipTextActive]}>전체</Text>
             </TouchableOpacity>
-          ))
-        )}
+            {CATEGORIES.map((c) => (
+              <TouchableOpacity
+                key={c.key}
+                style={[styles.chip, selectedCategory === c.key && styles.chipActive]}
+                onPress={() => setSelectedCategory(c.key)}
+              >
+                <Text style={[styles.chipText, selectedCategory === c.key && styles.chipTextActive]}>
+                  {c.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.newLimit}>새 문장은 최대 {NEW_SENTENCE_LIMIT}개까지 추가됩니다</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.startBtn, totalCount === 0 && styles.startBtnDisabled]}
+          onPress={handleStart}
+          disabled={totalCount === 0}
+        >
+          <Text style={styles.startBtnText}>
+            {totalCount === 0 ? "학습할 문장 없음" : `시작하기  ${totalCount}문장 →`}
+          </Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -235,7 +197,8 @@ export default function PracticeHome() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
-  content: { padding: 16, gap: 0, paddingBottom: 40 },
+  content: { padding: 16, paddingBottom: 40 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   statsBar: {
     flexDirection: "row",
     backgroundColor: "#FFFFFF",
@@ -260,50 +223,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  heatmapTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#6B7280",
-    marginBottom: 10,
+  heatmapTitle: { fontSize: 13, fontWeight: "600", color: "#6B7280", marginBottom: 10 },
+  queueCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    gap: 20,
   },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  section: { marginBottom: 24 },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 12,
-  },
-  reviewCard: {
+  queueTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
+  queueSummary: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 10,
+  },
+  queueBadge: {
+    alignItems: "center",
     backgroundColor: "#EBF2FF",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 2,
   },
-  reviewCardLeft: { flex: 1, gap: 4 },
-  directionBadge: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#1A56DB",
-    backgroundColor: "#DBEAFE",
-    alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  reviewText: { fontSize: 14, color: "#1E40AF", lineHeight: 20 },
-  chevron: { fontSize: 20, color: "#1A56DB" },
-  moreText: { fontSize: 13, color: "#6B7280", textAlign: "center", marginTop: 4 },
-  filterLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#6B7280",
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  queueBadgeNew: { backgroundColor: "#F0FDF4" },
+  queueBadgeNum: { fontSize: 22, fontWeight: "700", color: "#1A56DB" },
+  queueBadgeNumNew: { color: "#059669" },
+  queueBadgeLabel: { fontSize: 11, color: "#1A56DB", fontWeight: "500" },
+  queueBadgeLabelNew: { color: "#059669" },
+  queuePlus: { fontSize: 18, color: "#9CA3AF", fontWeight: "300" },
+  queueEquals: { fontSize: 18, color: "#9CA3AF", fontWeight: "300" },
+  queueTotal: { fontSize: 22, fontWeight: "700", color: "#111827" },
+  filterSection: { gap: 8 },
+  filterLabel: { fontSize: 12, fontWeight: "600", color: "#6B7280", marginTop: 4 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 7,
@@ -315,36 +268,13 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: "#1A56DB", borderColor: "#1A56DB" },
   chipText: { fontSize: 13, color: "#374151", fontWeight: "500" },
   chipTextActive: { color: "#FFFFFF" },
-  emptyBox: {
-    padding: 32,
+  newLimit: { fontSize: 11, color: "#9CA3AF", marginTop: 4 },
+  startBtn: {
+    backgroundColor: "#1A56DB",
+    paddingVertical: 18,
+    borderRadius: 12,
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderStyle: "dashed",
   },
-  emptyText: { fontSize: 14, color: "#9CA3AF", textAlign: "center" },
-  sentenceCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    gap: 6,
-  },
-  sentenceCardMeta: { flexDirection: "row", alignItems: "center", gap: 8 },
-  categoryBadge: {
-    fontSize: 11,
-    color: "#6B7280",
-    backgroundColor: "#F3F4F6",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    fontWeight: "500",
-  },
-  difficultyText: { fontSize: 12, color: "#F59E0B" },
-  sentenceText: { fontSize: 15, color: "#374151", lineHeight: 22 },
+  startBtnDisabled: { backgroundColor: "#E5E7EB" },
+  startBtnText: { fontSize: 17, fontWeight: "700", color: "#FFFFFF" },
 });
