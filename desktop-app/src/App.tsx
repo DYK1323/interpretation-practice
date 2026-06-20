@@ -1085,6 +1085,8 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
   const [lastImportAt, setLastImportAt] = useState<number | null>(null);
   const [lastExportAt, setLastExportAt] = useState<number | null>(null);
   const [syncMsg, setSyncMsg] = useState("");
+  const [setupModalOpen, setSetupModalOpen] = useState(false);
+  const [modalUrl, setModalUrl] = useState("");
   const [limitInput, setLimitInput] = useState(String(settings.dailyNewLimit));
   const [customSpeedText, setCustomSpeedText] = useState(PRESET_SPEEDS.includes(settings.playbackSpeed) ? "" : String(settings.playbackSpeed));
 
@@ -1100,12 +1102,20 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
     await refresh();
   }
 
-  async function handleSaveUrl() {
-    const url = scriptUrl.trim();
-    if (!url) return;
-    await api.setStringSetting(SCRIPT_URL_KEY, url);
-    setSyncMsg("URL이 저장됐습니다.");
-    setTimeout(() => setSyncMsg(""), 2000);
+  function openSetupModal() {
+    setModalUrl(scriptUrl);
+    setSetupModalOpen(true);
+  }
+
+  async function saveAndCloseModal() {
+    const url = modalUrl.trim();
+    if (url) {
+      await api.setStringSetting(SCRIPT_URL_KEY, url);
+      setScriptUrl(url);
+      setSyncMsg("URL이 저장됐습니다.");
+      setTimeout(() => setSyncMsg(""), 2000);
+    }
+    setSetupModalOpen(false);
   }
 
   async function handleImport() {
@@ -1181,41 +1191,35 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
   }
 
   return (
+    <>
     <section className="screen settings">
       <div className="group">
-        <h2>Apps Script 동기화</h2>
-        <p>Google Apps Script를 통해 앱과 스프레드시트를 양방향으로 동기화합니다. 최초 설정 후에는 버튼 하나로 가져오기·내보내기가 가능합니다.</p>
-        <ol className="syncSteps">
-          {SYNC_STEPS.map((step, i) => <li key={i}>{step}</li>)}
-        </ol>
-        <div className="codeBlock">
-          <div className="codeHeader">
-            <span>Apps Script 코드</span>
-            <button onClick={() => navigator.clipboard.writeText(SCRIPT_CODE)}>복사</button>
-          </div>
-          <pre>{SCRIPT_CODE}</pre>
-        </div>
-        <input
-          value={scriptUrl}
-          onChange={(e) => setScriptUrl(e.target.value)}
-          placeholder="https://script.google.com/macros/s/.../exec"
-        />
-        <button onClick={handleSaveUrl}>URL 저장</button>
-        <div className="syncActions">
-          <div className="syncAction">
-            <button className="primary" onClick={handleImport} disabled={importing}>
-              {importing ? "가져오는 중…" : "시트 → 앱으로 가져오기"}
-            </button>
-            <span className="hint">시트 내용을 앱 라이브러리로 가져옵니다. 기존 문장은 덮어씁니다.{lastImportAt ? ` · 마지막: ${formatSyncTime(lastImportAt)}` : ""}</span>
-          </div>
-          <div className="syncAction">
-            <button onClick={handleExport} disabled={exporting}>
-              {exporting ? "내보내는 중…" : "앱 → 시트로 내보내기"}
-            </button>
-            <span className="hint">앱의 모든 문장을 시트에 씁니다. 시트 기존 내용은 덮어씁니다.{lastExportAt ? ` · 마지막: ${formatSyncTime(lastExportAt)}` : ""}</span>
-          </div>
-        </div>
-        {syncMsg && <span className="syncMsg">{syncMsg}</span>}
+        <h2>양방향 동기화</h2>
+        {!scriptUrl ? (
+          <>
+            <p>Google Apps Script를 통해 앱과 스프레드시트를 양방향으로 동기화합니다.</p>
+            <button className="linkBtn" onClick={openSetupModal}>설정하기 →</button>
+          </>
+        ) : (
+          <>
+            <div className="syncActions">
+              <div className="syncAction">
+                <button className="primary" onClick={handleImport} disabled={importing}>
+                  {importing ? "가져오는 중…" : "시트 → 앱으로 가져오기"}
+                </button>
+                {lastImportAt && <span className="hint">마지막 가져오기: {formatSyncTime(lastImportAt)}</span>}
+              </div>
+              <div className="syncAction">
+                <button onClick={handleExport} disabled={exporting}>
+                  {exporting ? "내보내는 중…" : "앱 → 시트로 내보내기"}
+                </button>
+                {lastExportAt && <span className="hint">마지막 내보내기: {formatSyncTime(lastExportAt)}</span>}
+              </div>
+            </div>
+            {syncMsg && <span className="syncMsg">{syncMsg}</span>}
+            <button className="linkBtn" onClick={openSetupModal}>설정 변경 →</button>
+          </>
+        )}
       </div>
 
       <div className="group">
@@ -1278,6 +1282,40 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
         <InfoRow label="음성 인식" value="Vosk 로컬 모델 (무료)" />
       </div>
     </section>
+    {setupModalOpen && (
+      <div className="modalBackdrop" onClick={() => setSetupModalOpen(false)}>
+        <div className="modal syncSetupModal" onClick={(e) => e.stopPropagation()}>
+          <div className="modalHeader">
+            <h2>양방향 동기화 설정</h2>
+            <button className="closeBtn" onClick={() => setSetupModalOpen(false)}>✕</button>
+          </div>
+          <p className="setupModalDesc">Google Apps Script를 통해 앱과 스프레드시트를 양방향으로 동기화합니다. 최초 설정 후에는 버튼 하나로 가져오기·내보내기가 가능합니다.</p>
+          <ol className="syncSteps">
+            {SYNC_STEPS.map((step, i) => <li key={i}>{step}</li>)}
+          </ol>
+          <div className="codeBlock">
+            <div className="codeHeader">
+              <span>Apps Script 코드</span>
+              <button onClick={() => navigator.clipboard.writeText(SCRIPT_CODE)}>복사</button>
+            </div>
+            <pre>{SCRIPT_CODE}</pre>
+          </div>
+          <div>
+            <label className="setupUrlLabel">웹 앱 URL</label>
+            <input
+              value={modalUrl}
+              onChange={(e) => setModalUrl(e.target.value)}
+              placeholder="https://script.google.com/macros/s/.../exec"
+            />
+          </div>
+          <div className="modalActions">
+            <button onClick={() => setSetupModalOpen(false)}>닫기</button>
+            <button className="primary" onClick={saveAndCloseModal}>저장</button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

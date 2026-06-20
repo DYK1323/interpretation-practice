@@ -1,7 +1,7 @@
 {
   "tool_name": "PowerShell",
-  "tool_input_preview": "{\"command\":\"cd \\\"c:\\\\Users\\\\DAYOUNG\\\\260522\\\\desktop-app\\\"; npm run tauri build 2>&1\",\"timeout\":600000,\"description\":\"Run Tauri build\"}",
-  "error": "Exit code 1\n> interp-practice-desktop@1.0.0 tauri\n> tauri build\n\n        Info Looking up installed tauri packages to check mismatched versions...\nFound version mismatched Tauri packages. Make sure the NPM package and Rust crate versions are on the same major/minor releases:\ntauri (v2.9.5) : @tauri-apps/api (v2.11.1)\n       Error Found version mismatched Tauri packages. Make sure the NPM package and Rust crate versions are on the same major/minor releases:\ntauri (v2.9.5) : @tauri-apps/api (v2.11....",
-  "timestamp": "2026-06-20T13:00:43.499Z",
+  "tool_input_preview": "{\"command\":\"cd \\\"c:\\\\Users\\\\DAYOUNG\\\\260522\\\\desktop-app\\\"; npm run tauri build 2>&1\",\"timeout\":600000,\"description\":\"Run Tauri build with NSIS target\"}",
+  "error": "Exit code 1\n> interp-practice-desktop@1.0.0 tauri\n> tauri build\n\n        Info Looking up installed tauri packages to check mismatched versions...\n     Running beforeBuildCommand `npm run build`\n\n> interp-practice-desktop@1.0.0 build\n> tsc && vite build\n\n\u001b[36mvite v7.3.5 \u001b[32mbuilding client environment for production...\u001b[36m\u001b[39m\ntransforming...\n\u001b[32m✓\u001b[39m 35 modules transformed.\nrendering chunks...\ncomputing gzip size...\n\u001b[2mdist/\u001b[22m\u001b[32mindex.html                 \u001b[39m\u001b[1m\u001b[2m  0.41 kB\u001b[22m...",
+  "timestamp": "2026-06-20T13:27:57.305Z",
   "retry_count": 1
 }

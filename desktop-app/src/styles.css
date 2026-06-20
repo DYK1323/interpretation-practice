@@ -1759,3 +1759,52 @@ audio {
   background: var(--green-soft);
   border-radius: 8px;
 }
+.linkBtn {
+  background: none;
+  border: none;
+  min-height: unset;
+  padding: 0;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.syncSetupModal {
+  width: min(680px, 100%);
+}
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.modalHeader h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.closeBtn {
+  background: none;
+  border: none;
+  min-height: unset;
+  padding: 4px 8px;
+  font-size: 18px;
+  color: var(--muted);
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.setupModalDesc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.setupUrlLabel {
+  display: block;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 6px;
+}

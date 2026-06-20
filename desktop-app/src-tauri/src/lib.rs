@@ -361,7 +361,7 @@ fn save_result(app: tauri::AppHandle, result: SessionResult) -> Result<(), Strin
 fn get_results(app: tauri::AppHandle, limit: i64) -> Result<Vec<SessionResult>, String> {
     let db = conn(&app)?;
     let mut stmt = db.prepare("SELECT * FROM session_results ORDER BY timestamp DESC LIMIT ?").map_err(|e| e.to_string())?;
-    stmt.query_map(params![limit], |row| {
+    let rows = stmt.query_map(params![limit], |row| {
         Ok(SessionResult {
             id: row.get("id")?,
             sentence_id: row.get("sentence_id")?,
@@ -376,7 +376,8 @@ fn get_results(app: tauri::AppHandle, limit: i64) -> Result<Vec<SessionResult>, 
     })
     .map_err(|e| e.to_string())?
     .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string());
+    rows
 }
 
 #[tauri::command]
