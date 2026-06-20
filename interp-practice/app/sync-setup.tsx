@@ -17,6 +17,31 @@ import { getStringSetting, setStringSetting } from "../src/db/settings";
 import { syncFromScript, exportToScript } from "../src/utils/scriptSync";
 
 const SCRIPT_URL_KEY = "scriptSyncUrl";
+const LAST_IMPORT_KEY = "scriptLastImportAt";
+const LAST_EXPORT_KEY = "scriptLastExportAt";
+
+function formatSyncTime(ts: number): string {
+  const d = new Date(ts);
+  const now = new Date();
+  const diffMs = Date.now() - ts;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHour = Math.floor(diffMs / 3600000);
+  const diffDay = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) return "방금 전";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  if (diffHour < 24) return `${diffHour}시간 전`;
+  if (diffDay < 7) return `${diffDay}일 전`;
+
+  const isSameYear = d.getFullYear() === now.getFullYear();
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const hour = d.getHours().toString().padStart(2, "0");
+  const min = d.getMinutes().toString().padStart(2, "0");
+  return isSameYear
+    ? `${month}/${day} ${hour}:${min}`
+    : `${d.getFullYear()}/${month}/${day}`;
+}
 
 const SCRIPT_CODE = `function doGet() {
   const sheet = SpreadsheetApp
@@ -59,9 +84,13 @@ export default function SyncSetupScreen() {
   const [scriptUrl, setScriptUrl] = useState("");
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [lastImportAt, setLastImportAt] = useState<number | null>(null);
+  const [lastExportAt, setLastExportAt] = useState<number | null>(null);
 
   useEffect(() => {
     getStringSetting(SCRIPT_URL_KEY).then((v) => { if (v) setScriptUrl(v); });
+    getStringSetting(LAST_IMPORT_KEY).then((v) => { if (v) setLastImportAt(Number(v)); });
+    getStringSetting(LAST_EXPORT_KEY).then((v) => { if (v) setLastExportAt(Number(v)); });
   }, []);
 
   async function handleSaveUrl() {
@@ -79,6 +108,9 @@ export default function SyncSetupScreen() {
     setImporting(true);
     try {
       const { imported, failed } = await syncFromScript(url);
+      const now = Date.now();
+      await setStringSetting(LAST_IMPORT_KEY, String(now));
+      setLastImportAt(now);
       Alert.alert("가져오기 완료", `${imported}개 문장 가져옴${failed > 0 ? `, ${failed}개 실패` : ""}`);
     } catch (e: any) {
       Alert.alert("가져오기 실패", e?.message ?? "알 수 없는 오류");
@@ -93,6 +125,9 @@ export default function SyncSetupScreen() {
     setExporting(true);
     try {
       const count = await exportToScript(url);
+      const now = Date.now();
+      await setStringSetting(LAST_EXPORT_KEY, String(now));
+      setLastExportAt(now);
       const msg = `${count}개 문장을 시트에 내보냈습니다.`;
       if (Platform.OS === "android") ToastAndroid.show(msg, ToastAndroid.SHORT);
       else Alert.alert("내보내기 완료", msg);
@@ -180,7 +215,12 @@ export default function SyncSetupScreen() {
             : <Text style={styles.actionBtnText}>시트 → 앱으로 가져오기</Text>
           }
         </TouchableOpacity>
-        <Text style={styles.hint}>시트 내용을 앱 라이브러리로 가져옵니다. 기존 문장은 덮어씁니다.</Text>
+        <View style={styles.hintRow}>
+          <Text style={styles.hint}>시트 내용을 앱 라이브러리로 가져옵니다. 기존 문장은 덮어씁니다.</Text>
+          {lastImportAt && (
+            <Text style={styles.lastSyncText}>마지막: {formatSyncTime(lastImportAt)}</Text>
+          )}
+        </View>
 
         <TouchableOpacity
           style={[styles.actionBtn, styles.actionBtnSecondary, exporting && styles.actionBtnDisabled]}
@@ -192,7 +232,12 @@ export default function SyncSetupScreen() {
             : <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>앱 → 시트로 내보내기</Text>
           }
         </TouchableOpacity>
-        <Text style={styles.hint}>앱의 모든 문장과 학습 진도를 시트에 씁니다. 시트 기존 내용은 덮어씁니다.</Text>
+        <View style={styles.hintRow}>
+          <Text style={styles.hint}>앱의 모든 문장과 학습 진도를 시트에 씁니다. 시트 기존 내용은 덮어씁니다.</Text>
+          {lastExportAt && (
+            <Text style={styles.lastSyncText}>마지막: {formatSyncTime(lastExportAt)}</Text>
+          )}
+        </View>
 
       </ScrollView>
     </>
@@ -298,5 +343,7 @@ const styles = StyleSheet.create({
   actionBtnDisabled: { opacity: 0.5 },
   actionBtnText: { fontSize: 15, fontWeight: "700", color: "#FFFFFF" },
   actionBtnTextSecondary: { color: "#1A56DB" },
-  hint: { fontSize: 12, color: "#9CA3AF", marginTop: 6, marginBottom: 4 },
+  hintRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginTop: 6, marginBottom: 4, gap: 8 },
+  hint: { fontSize: 12, color: "#9CA3AF", flex: 1 },
+  lastSyncText: { fontSize: 12, color: "#6B7280", flexShrink: 0 },
 });
