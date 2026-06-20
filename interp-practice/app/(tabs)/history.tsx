@@ -100,17 +100,21 @@ export default function HistoryScreen() {
             {isExpanded && (
               <View style={styles.expanded}>
                 <View style={styles.divider} />
-                {result.interpRecordingUri ? (
-                  <>
-                    <Text style={styles.expandLabel}>통역 녹음</Text>
-                    <AudioPlayer source={{ type: "file", uri: result.interpRecordingUri }} />
-                  </>
-                ) : null}
-                {result.backInterpRecordingUri ? (
-                  <>
-                    <Text style={styles.expandLabel}>재통역 녹음</Text>
-                    <AudioPlayer source={{ type: "file", uri: result.backInterpRecordingUri }} />
-                  </>
+                {(result.interpRecordingUri || result.backInterpRecordingUri) ? (
+                  <View style={styles.replayRow}>
+                    {result.interpRecordingUri ? (
+                      <View style={styles.replayItem}>
+                        <Text style={styles.expandLabel}>통역 녹음</Text>
+                        <AudioPlayer source={{ type: "file", uri: result.interpRecordingUri }} />
+                      </View>
+                    ) : null}
+                    {result.backInterpRecordingUri ? (
+                      <View style={styles.replayItem}>
+                        <Text style={styles.expandLabel}>재통역 녹음</Text>
+                        <AudioPlayer source={{ type: "file", uri: result.backInterpRecordingUri }} />
+                      </View>
+                    ) : null}
+                  </View>
                 ) : null}
                 <Text style={styles.expandLabel}>내 재통역</Text>
                 <Text style={styles.expandText}>
@@ -181,6 +185,8 @@ const styles = StyleSheet.create({
   dateText: { fontSize: 12, color: "#9CA3AF" },
   originalText: { fontSize: 15, color: "#374151", lineHeight: 22 },
   expanded: { gap: 8 },
+  replayRow: { flexDirection: "row", gap: 10 },
+  replayItem: { flex: 1, gap: 4 },
   divider: { height: 1, backgroundColor: "#F3F4F6" },
   expandLabel: { fontSize: 11, fontWeight: "600", color: "#6B7280", textTransform: "uppercase" },
   expandText: { fontSize: 14, color: "#374151", lineHeight: 21 },
