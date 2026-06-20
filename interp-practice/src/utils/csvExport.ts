@@ -85,33 +85,38 @@ function rowToCSV(row: any): string {
   ].join(",");
 }
 
-export async function exportCSV(): Promise<number> {
-  const db = await getDB();
-  const rows = await db.getAllAsync<any>(`
-    SELECT s.*,
-      sp1.next_review_date AS enko_nrd, sp1.interval_days AS enko_id,
-      sp1.review_count     AS enko_rc,  sp1.last_studied_at AS enko_ls,
-      sp2.next_review_date AS koen_nrd, sp2.interval_days AS koen_id,
-      sp2.review_count     AS koen_rc,  sp2.last_studied_at AS koen_ls,
-      sp3.next_review_date AS jako_nrd, sp3.interval_days AS jako_id,
-      sp3.review_count     AS jako_rc,  sp3.last_studied_at AS jako_ls,
-      sp4.next_review_date AS koja_nrd, sp4.interval_days AS koja_id,
-      sp4.review_count     AS koja_rc,  sp4.last_studied_at AS koja_ls,
-      sp5.next_review_date AS zhko_nrd, sp5.interval_days AS zhko_id,
-      sp5.review_count     AS zhko_rc,  sp5.last_studied_at AS zhko_ls,
-      sp6.next_review_date AS kozh_nrd, sp6.interval_days AS kozh_id,
-      sp6.review_count     AS kozh_rc,  sp6.last_studied_at AS kozh_ls
-    FROM sentences s
-    LEFT JOIN sentence_progress sp1 ON s.id = sp1.sentence_id AND sp1.direction = 'en-ko'
-    LEFT JOIN sentence_progress sp2 ON s.id = sp2.sentence_id AND sp2.direction = 'ko-en'
-    LEFT JOIN sentence_progress sp3 ON s.id = sp3.sentence_id AND sp3.direction = 'ja-ko'
-    LEFT JOIN sentence_progress sp4 ON s.id = sp4.sentence_id AND sp4.direction = 'ko-ja'
-    LEFT JOIN sentence_progress sp5 ON s.id = sp5.sentence_id AND sp5.direction = 'zh-ko'
-    LEFT JOIN sentence_progress sp6 ON s.id = sp6.sentence_id AND sp6.direction = 'ko-zh'
-    ORDER BY s.id
-  `);
+const ALL_SENTENCES_QUERY = `
+  SELECT s.*,
+    sp1.next_review_date AS enko_nrd, sp1.interval_days AS enko_id,
+    sp1.review_count     AS enko_rc,  sp1.last_studied_at AS enko_ls,
+    sp2.next_review_date AS koen_nrd, sp2.interval_days AS koen_id,
+    sp2.review_count     AS koen_rc,  sp2.last_studied_at AS koen_ls,
+    sp3.next_review_date AS jako_nrd, sp3.interval_days AS jako_id,
+    sp3.review_count     AS jako_rc,  sp3.last_studied_at AS jako_ls,
+    sp4.next_review_date AS koja_nrd, sp4.interval_days AS koja_id,
+    sp4.review_count     AS koja_rc,  sp4.last_studied_at AS koja_ls,
+    sp5.next_review_date AS zhko_nrd, sp5.interval_days AS zhko_id,
+    sp5.review_count     AS zhko_rc,  sp5.last_studied_at AS zhko_ls,
+    sp6.next_review_date AS kozh_nrd, sp6.interval_days AS kozh_id,
+    sp6.review_count     AS kozh_rc,  sp6.last_studied_at AS kozh_ls
+  FROM sentences s
+  LEFT JOIN sentence_progress sp1 ON s.id = sp1.sentence_id AND sp1.direction = 'en-ko'
+  LEFT JOIN sentence_progress sp2 ON s.id = sp2.sentence_id AND sp2.direction = 'ko-en'
+  LEFT JOIN sentence_progress sp3 ON s.id = sp3.sentence_id AND sp3.direction = 'ja-ko'
+  LEFT JOIN sentence_progress sp4 ON s.id = sp4.sentence_id AND sp4.direction = 'ko-ja'
+  LEFT JOIN sentence_progress sp5 ON s.id = sp5.sentence_id AND sp5.direction = 'zh-ko'
+  LEFT JOIN sentence_progress sp6 ON s.id = sp6.sentence_id AND sp6.direction = 'ko-zh'
+  ORDER BY s.id
+`;
 
-  const csv = [HEADERS, ...rows.map(rowToCSV)].join("\n");
+export async function generateCSVString(): Promise<{ csv: string; count: number }> {
+  const db = await getDB();
+  const rows = await db.getAllAsync<any>(ALL_SENTENCES_QUERY);
+  return { csv: [HEADERS, ...rows.map(rowToCSV)].join("\n"), count: rows.length };
+}
+
+export async function exportCSV(): Promise<number> {
+  const { csv, count } = await generateCSVString();
 
   const today = new Date();
   const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
@@ -126,5 +131,5 @@ export async function exportCSV(): Promise<number> {
     UTI: "public.comma-separated-values-text",
   });
 
-  return rows.length;
+  return count;
 }

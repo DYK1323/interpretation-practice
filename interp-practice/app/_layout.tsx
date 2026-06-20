@@ -33,6 +33,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="library-edit/[id]" options={{ presentation: "modal", headerShown: false }} />
+        <Stack.Screen name="sync-setup" options={{ presentation: "modal", headerShown: false }} />
       </Stack>
     </>
   );

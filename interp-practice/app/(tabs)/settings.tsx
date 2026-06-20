@@ -14,6 +14,7 @@ import {
   Platform,
   ToastAndroid,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { getAllSettings, setSetting, getStringSetting, setStringSetting } from "../../src/db/settings";
 import { syncFromSheetUrl } from "../../src/utils/csvImport";
 import { exportCSV } from "../../src/utils/csvExport";
@@ -31,6 +32,7 @@ const PRESET_SPEEDS = SPEEDS.map((s) => s.value);
 const PRESET_LIMITS = [10, 20, 30];
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [sheetUrl, setSheetUrl] = useState("");
   const [syncing, setSyncing] = useState(false);
@@ -158,6 +160,12 @@ export default function SettingsScreen() {
             ? <ActivityIndicator size="small" color="#FFFFFF" />
             : <Text style={styles.actionBtnText}>시트에서 문장 가져오기</Text>
           }
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.advancedSyncBtn}
+          onPress={() => router.push("/sync-setup")}
+        >
+          <Text style={styles.advancedSyncBtnText}>실시간 동기화가 필요해요 →</Text>
         </TouchableOpacity>
       </View>
 
@@ -508,6 +516,8 @@ const styles = StyleSheet.create({
     borderColor: "#1A56DB",
   },
   actionBtnDisabled: { opacity: 0.5 },
+  advancedSyncBtn: { alignSelf: "flex-start", marginTop: 12 },
+  advancedSyncBtnText: { fontSize: 13, color: "#1A56DB", textDecorationLine: "underline" },
   actionBtnText: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
   actionBtnTextSecondary: { color: "#1A56DB" },
   row: {

@@ -97,7 +97,7 @@ function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
   };
 }
 
-async function importCSVContent(content: string): Promise<{ imported: number; failed: number }> {
+export async function importCSVContent(content: string): Promise<{ imported: number; failed: number }> {
   const lines = content.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return { imported: 0, failed: 0 };
 
