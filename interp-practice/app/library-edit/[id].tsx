@@ -295,11 +295,11 @@ export default function SentenceEdit() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>모범 한국어 통역 (영→한)</Text>
+          <Text style={styles.label}>모범 한국어 통역 <Text style={styles.optional}>(영→한 연습 전용)</Text></Text>
           <TextInput
             style={styles.textInput}
             multiline
-            placeholder="3단계 비교 화면에서 원문 아래에 표시 (없으면 생략)"
+            placeholder="영어 원문을 이렇게 통역하면 좋겠다 싶을 때 입력 — 3단계 비교 화면에서 원문 아래 표시"
             placeholderTextColor="#9CA3AF"
             value={modelKorean}
             onChangeText={setModelKorean}
@@ -307,11 +307,11 @@ export default function SentenceEdit() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>모범 영어 통역 (한→영)</Text>
+          <Text style={styles.label}>모범 영어 통역 <Text style={styles.optional}>(한→영 연습 전용)</Text></Text>
           <TextInput
             style={styles.textInput}
             multiline
-            placeholder="3단계 비교 화면에서 원문 아래에 표시 (없으면 생략)"
+            placeholder="한국어 원문을 이렇게 통역하면 좋겠다 싶을 때 입력 — 3단계 비교 화면에서 원문 아래 표시"
             placeholderTextColor="#9CA3AF"
             value={modelEnglish}
             onChangeText={setModelEnglish}

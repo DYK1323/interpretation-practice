@@ -321,12 +321,12 @@ export default function SettingsScreen() {
               <View style={styles.columnGuide}>
                 <Text style={styles.columnGuideTitle}>1행(헤더) 컬럼명</Text>
                 {([
-                  { name: "englishText",   desc: "영어 원문",                        required: true },
-                  { name: "koreanText",    desc: "한국어 번역",                       required: false },
-                  { name: "category",      desc: "분류 (news/business/conference/daily)", required: false },
-                  { name: "difficulty",    desc: "난이도 (1·2·3)",                   required: false },
-                  { name: "modelKorean",   desc: "영→한 연습 시 3단계 비교 화면에서 원문 아래 표시되는 모범 통역문. 한국어 작성.", required: false },
-                  { name: "modelEnglish",  desc: "한→영 연습 시 3단계 비교 화면에서 원문 아래 표시되는 모범 통역문. 영어 작성.", required: false },
+                  { name: "englishText",   desc: "영어 원문 — 영→한 연습의 원문으로 사용",  required: true },
+                  { name: "koreanText",    desc: "한국어 원문 — 한→영 연습의 원문으로 사용", required: false },
+                  { name: "category",      desc: "분류 (news/business/conference/daily)",   required: false },
+                  { name: "difficulty",    desc: "난이도 (1·2·3)",                          required: false },
+                  { name: "modelKorean",   desc: "영→한 연습 전용 모범 통역문 (한국어). 3단계 비교 화면에서 영어 원문 아래에 표시.", required: false },
+                  { name: "modelEnglish",  desc: "한→영 연습 전용 모범 통역문 (영어). 3단계 비교 화면에서 한국어 원문 아래에 표시.", required: false },
                   { name: "tags",          desc: "태그 (|로 구분)",                   required: false },
                   { name: "notes",         desc: "메모",                             required: false },
                 ] as const).map(({ name, desc, required }) => (
