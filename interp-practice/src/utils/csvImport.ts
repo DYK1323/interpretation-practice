@@ -85,6 +85,8 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
 
   const headers = parseCSVLine(lines[0]);
   const keepDifficulty = !headers.includes("difficulty");
+  const hasProgress =
+    headers.includes("enkoNextReviewDate") || headers.includes("koenNextReviewDate");
 
   const entries: SentenceEntry[] = [];
   let failed = 0;
@@ -98,8 +100,12 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
 
   const db = await getDB();
   await db.withTransactionAsync(async () => {
-    for (const e of entries) {
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      const cols = parseCSVLine(lines[i + 1]);
+      const get = (key: string) => cols[headers.indexOf(key)]?.trim() ?? "";
       const diffParam = keepDifficulty ? null : e.difficulty;
+
       await db.runAsync(
         `INSERT INTO sentences (
           id, category, difficulty, english_text, korean_text,
@@ -131,10 +137,49 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
           JSON.stringify(e.tags), e.durationSeconds ?? null, e.notes ?? null,
         ]
       );
+
+      if (hasProgress) {
+        await upsertProgressFromRow(db, e.id, "en-ko", {
+          nextReviewDate: get("enkoNextReviewDate"),
+          intervalDays: get("enkoIntervalDays"),
+          reviewCount: get("enkoReviewCount"),
+          lastStudiedAt: get("enkoLastStudiedAt"),
+        });
+        await upsertProgressFromRow(db, e.id, "ko-en", {
+          nextReviewDate: get("koenNextReviewDate"),
+          intervalDays: get("koenIntervalDays"),
+          reviewCount: get("koenReviewCount"),
+          lastStudiedAt: get("koenLastStudiedAt"),
+        });
+      }
     }
   });
 
   return { imported: entries.length, failed };
+}
+
+async function upsertProgressFromRow(
+  db: any,
+  sentenceId: string,
+  direction: string,
+  fields: { nextReviewDate: string; intervalDays: string; reviewCount: string; lastStudiedAt: string }
+) {
+  const nextReviewDate = parseInt(fields.nextReviewDate, 10);
+  const intervalDays = parseInt(fields.intervalDays, 10);
+  if (!nextReviewDate || !intervalDays) return;
+  const reviewCount = parseInt(fields.reviewCount, 10) || 0;
+  const lastStudiedAt = parseInt(fields.lastStudiedAt, 10) || null;
+
+  await db.runAsync(
+    `INSERT INTO sentence_progress (sentence_id, direction, next_review_date, interval_days, review_count, last_studied_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(sentence_id, direction) DO UPDATE SET
+       next_review_date = excluded.next_review_date,
+       interval_days = excluded.interval_days,
+       review_count = excluded.review_count,
+       last_studied_at = excluded.last_studied_at`,
+    [sentenceId, direction, nextReviewDate, intervalDays, reviewCount, lastStudiedAt]
+  );
 }
 
 export async function importCSV(): Promise<{ imported: number; failed: number }> {

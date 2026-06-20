@@ -17,7 +17,6 @@ import {
 import { getAllSettings, setSetting, getStringSetting, setStringSetting } from "../../src/db/settings";
 import { syncFromSheetUrl } from "../../src/utils/csvImport";
 import { exportCSV } from "../../src/utils/csvExport";
-import { exportFullBackup, importFullBackup } from "../../src/utils/fullBackup";
 import type { UserSettings } from "../../src/types";
 import { DEFAULT_SETTINGS } from "../../src/types";
 
@@ -34,8 +33,6 @@ export default function SettingsScreen() {
   const [sheetUrl, setSheetUrl] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportingBackup, setExportingBackup] = useState(false);
-  const [importingBackup, setImportingBackup] = useState(false);
   const [limitModalVisible, setLimitModalVisible] = useState(false);
   const [limitInput, setLimitInput] = useState("");
   const limitInputRef = useRef<TextInput>(null);
@@ -85,37 +82,6 @@ export default function SettingsScreen() {
       Alert.alert("동기화 실패", e?.message ?? "알 수 없는 오류");
     } finally {
       setSyncing(false);
-    }
-  }
-
-  async function handleExportBackup() {
-    setExportingBackup(true);
-    try {
-      const { sentences, progress } = await exportFullBackup();
-      if (Platform.OS === "android") {
-        ToastAndroid.show(`문장 ${sentences}개, 진도 ${progress}개 백업 완료`, ToastAndroid.SHORT);
-      }
-    } catch (e: any) {
-      Alert.alert("백업 실패", e?.message ?? "알 수 없는 오류");
-    } finally {
-      setExportingBackup(false);
-    }
-  }
-
-  async function handleImportBackup() {
-    setImportingBackup(true);
-    try {
-      const { sentences, progress, failed, canceled } = await importFullBackup();
-      if (!canceled) {
-        Alert.alert(
-          "복원 완료",
-          `문장 ${sentences}개, 진도 ${progress}개 복원됨${failed > 0 ? `\n(${failed}개 실패)` : ""}`
-        );
-      }
-    } catch (e: any) {
-      Alert.alert("복원 실패", e?.message ?? "알 수 없는 오류");
-    } finally {
-      setImportingBackup(false);
     }
   }
 
@@ -170,7 +136,7 @@ export default function SettingsScreen() {
       <View style={styles.group}>
         <Text style={styles.groupTitle}>데이터 내보내기</Text>
         <Text style={styles.desc}>
-          앱의 모든 문장을 CSV로 내보냅니다. 구글 드라이브에 저장하거나 백업으로 보관하세요.
+          문장과 학습 진도(복습 일정·횟수)를 CSV로 내보냅니다. 구글 드라이브에 저장해두면 폰을 바꿔도 구글 시트 동기화로 복원할 수 있습니다.
         </Text>
         <TouchableOpacity
           style={[styles.actionBtn, styles.actionBtnSecondary, exporting && styles.actionBtnDisabled]}
@@ -183,35 +149,6 @@ export default function SettingsScreen() {
           }
         </TouchableOpacity>
         <Text style={styles.hint}>공유 창에서 구글 드라이브를 선택하세요</Text>
-      </View>
-
-      {/* 전체 백업 */}
-      <View style={styles.group}>
-        <Text style={styles.groupTitle}>전체 백업</Text>
-        <Text style={styles.desc}>
-          문장과 학습 진도(복습 일정·횟수)를 하나의 파일로 백업합니다. 폰을 바꿔도 이어서 학습할 수 있습니다.
-        </Text>
-        <TouchableOpacity
-          style={[styles.actionBtn, exportingBackup && styles.actionBtnDisabled]}
-          onPress={handleExportBackup}
-          disabled={exportingBackup}
-        >
-          {exportingBackup
-            ? <ActivityIndicator size="small" color="#FFFFFF" />
-            : <Text style={styles.actionBtnText}>전체 백업 내보내기</Text>
-          }
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnSecondary, importingBackup && styles.actionBtnDisabled]}
-          onPress={handleImportBackup}
-          disabled={importingBackup}
-        >
-          {importingBackup
-            ? <ActivityIndicator size="small" color="#1A56DB" />
-            : <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>백업 파일로 복원하기</Text>
-          }
-        </TouchableOpacity>
-        <Text style={styles.hint}>복원 시 기존 문장·진도에 덮어씌워집니다</Text>
       </View>
 
       {/* 연습 설정 */}
