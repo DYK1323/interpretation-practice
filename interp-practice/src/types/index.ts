@@ -44,7 +44,7 @@ export interface SessionResult {
 
 export interface UserSettings {
   showSourceTextDuringListen: boolean;
-  playbackSpeed: 0.75 | 1.0 | 1.25;
+  playbackSpeed: 0.5 | 0.75 | 1.0;
   shuffleSentences: boolean;
   dailyNewLimit: number;
 }

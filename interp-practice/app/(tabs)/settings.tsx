@@ -21,9 +21,9 @@ import type { UserSettings } from "../../src/types";
 import { DEFAULT_SETTINGS } from "../../src/types";
 
 const SPEEDS = [
+  { value: 0.5 as const, label: "0.5x (매우 느리게)" },
   { value: 0.75 as const, label: "0.75x (느리게)" },
   { value: 1.0 as const, label: "1.0x (보통)" },
-  { value: 1.25 as const, label: "1.25x (빠르게)" },
 ];
 
 const PRESET_LIMITS = [10, 20, 30];
