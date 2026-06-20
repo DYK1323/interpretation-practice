@@ -22,10 +22,11 @@ import { DEFAULT_SETTINGS } from "../../src/types";
 import { FOREIGN_LANGUAGE_LABELS } from "../../src/constants";
 
 const SPEEDS = [
-  { value: 0.5 as const, label: "0.5x (매우 느리게)" },
-  { value: 0.75 as const, label: "0.75x (느리게)" },
-  { value: 1.0 as const, label: "1.0x (보통)" },
+  { value: 0.5, label: "0.5x (매우 느리게)" },
+  { value: 0.75, label: "0.75x (느리게)" },
+  { value: 1.0, label: "1.0x (보통)" },
 ];
+const PRESET_SPEEDS = SPEEDS.map((s) => s.value);
 
 const PRESET_LIMITS = [10, 20, 30];
 
@@ -39,6 +40,7 @@ export default function SettingsScreen() {
   const [limitModalVisible, setLimitModalVisible] = useState(false);
   const [limitInput, setLimitInput] = useState("");
   const limitInputRef = useRef<TextInput>(null);
+  const [customSpeedText, setCustomSpeedText] = useState("");
 
   useEffect(() => {
     loadSettings();
@@ -47,6 +49,9 @@ export default function SettingsScreen() {
   async function loadSettings() {
     const s = await getAllSettings();
     setSettings(s);
+    if (!PRESET_SPEEDS.includes(s.playbackSpeed)) {
+      setCustomSpeedText(String(s.playbackSpeed));
+    }
     const url = await getStringSetting("sheetSyncUrl");
     if (url) setSheetUrl(url);
   }
@@ -54,6 +59,18 @@ export default function SettingsScreen() {
   async function updateSetting<K extends keyof UserSettings>(key: K, value: UserSettings[K]) {
     await setSetting(key, value);
     setSettings((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleCustomSpeed() {
+    const v = parseFloat(customSpeedText);
+    if (isNaN(v) || v < 0.1 || v > 2.0) {
+      Alert.alert("0.1 ~ 2.0 사이 숫자를 입력하세요");
+      setCustomSpeedText("");
+      return;
+    }
+    const rounded = Math.round(v * 100) / 100;
+    updateSetting("playbackSpeed", rounded);
+    setCustomSpeedText(String(rounded));
   }
 
   function handleCustomLimit() {
@@ -269,7 +286,10 @@ export default function SettingsScreen() {
           <TouchableOpacity
             key={s.value}
             style={styles.radioRow}
-            onPress={() => updateSetting("playbackSpeed", s.value)}
+            onPress={() => {
+              updateSetting("playbackSpeed", s.value);
+              setCustomSpeedText("");
+            }}
           >
             <View
               style={[
@@ -280,6 +300,28 @@ export default function SettingsScreen() {
             <Text style={styles.radioLabel}>{s.label}</Text>
           </TouchableOpacity>
         ))}
+        <View style={styles.radioRow}>
+          <View
+            style={[
+              styles.radioCircle,
+              !PRESET_SPEEDS.includes(settings.playbackSpeed) && styles.radioCircleActive,
+            ]}
+          />
+          <Text style={styles.radioLabel}>직접 입력  </Text>
+          <TextInput
+            style={styles.speedInput}
+            keyboardType="decimal-pad"
+            placeholder="예: 0.6"
+            placeholderTextColor="#9CA3AF"
+            value={customSpeedText}
+            onChangeText={setCustomSpeedText}
+            onBlur={handleCustomSpeed}
+            returnKeyType="done"
+            onSubmitEditing={handleCustomSpeed}
+          />
+          <Text style={styles.radioLabel}>x</Text>
+        </View>
+        <Text style={styles.speedHint}>0.1 ~ 2.0 범위로 입력</Text>
       </View>
 
       {/* 정보 */}
@@ -508,6 +550,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#1A56DB",
   },
   radioLabel: { fontSize: 15, color: "#374151" },
+  speedInput: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    fontSize: 15,
+    color: "#111827",
+    minWidth: 60,
+    textAlign: "center",
+  },
+  speedHint: { fontSize: 12, color: "#9CA3AF", marginTop: 4, marginLeft: 32 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",

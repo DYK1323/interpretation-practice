@@ -53,7 +53,7 @@ export interface SessionResult {
 
 export interface UserSettings {
   showSourceTextDuringListen: boolean;
-  playbackSpeed: 0.5 | 0.75 | 1.0;
+  playbackSpeed: number;
   shuffleSentences: boolean;
   dailyNewLimit: number;
   foreignLanguage: ForeignLanguage;
