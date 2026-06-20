@@ -14,6 +14,8 @@ export function useSTT(direction: Direction, onEnd?: (text: string) => void) {
   const accumulatedRef = useRef("");
   // Final text from the current active session
   const currentFinalRef = useRef("");
+  // Latest interim text (fallback for Android where end fires before isFinal)
+  const lastInterimRef = useRef("");
   const isListeningRef = useRef(false);
   // true while user wants STT running; auto-restart fires only when true
   const activeRef = useRef(false);
@@ -27,6 +29,7 @@ export function useSTT(direction: Direction, onEnd?: (text: string) => void) {
     isListeningRef.current = true;
     setIsListening(true);
     currentFinalRef.current = "";
+    lastInterimRef.current = "";
   });
 
   useSpeechRecognitionEvent("end", () => {
@@ -35,8 +38,11 @@ export function useSTT(direction: Direction, onEnd?: (text: string) => void) {
 
     if (activeRef.current) {
       // Silence timeout ended the session — save segment and auto-restart
-      accumulatedRef.current = getFullText();
+      // Fallback to lastInterim if final hasn't arrived yet (Android race)
+      const segment = currentFinalRef.current || lastInterimRef.current;
+      accumulatedRef.current = [accumulatedRef.current, segment].filter(Boolean).join(" ");
       currentFinalRef.current = "";
+      lastInterimRef.current = "";
       setTimeout(() => {
         if (activeRef.current) {
           ExpoSpeechRecognitionModule.start({
@@ -53,6 +59,7 @@ export function useSTT(direction: Direction, onEnd?: (text: string) => void) {
 
   useSpeechRecognitionEvent("result", (event) => {
     const text = event.results[0]?.transcript ?? "";
+    lastInterimRef.current = text;
     if (event.isFinal) {
       currentFinalRef.current = text;
     }
@@ -73,6 +80,8 @@ export function useSTT(direction: Direction, onEnd?: (text: string) => void) {
           });
         }
       }, 500);
+    } else {
+      onEndRef.current?.(getFullText().trim());
     }
   });
 
