@@ -299,7 +299,7 @@ export default function SentenceEdit() {
           <TextInput
             style={styles.textInput}
             multiline
-            placeholder="영어 원문을 이렇게 통역하면 좋겠다 싶을 때 입력 — 3단계 비교 화면에서 원문 아래 표시"
+            placeholder="비워두면 한국어 원문이 표시됨. 별도 모범 통역이 있을 때만 입력."
             placeholderTextColor="#9CA3AF"
             value={modelKorean}
             onChangeText={setModelKorean}
@@ -311,7 +311,7 @@ export default function SentenceEdit() {
           <TextInput
             style={styles.textInput}
             multiline
-            placeholder="한국어 원문을 이렇게 통역하면 좋겠다 싶을 때 입력 — 3단계 비교 화면에서 원문 아래 표시"
+            placeholder="비워두면 영어 원문이 표시됨. 별도 모범 통역이 있을 때만 입력."
             placeholderTextColor="#9CA3AF"
             value={modelEnglish}
             onChangeText={setModelEnglish}
