@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  AppState,
 } from "react-native";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { getSentenceById, upsertSentence, updateSentenceAudio } from "../../../src/db/sentences";
+import { useLocalSearchParams, useRouter, Stack, useNavigation } from "expo-router";
+import * as FileSystem from "expo-file-system";
+import { getSentenceById, upsertSentence, updateSentenceAudio, deleteSentence } from "../../../src/db/sentences";
 import { RecordButton } from "../../../src/components/RecordButton";
 import { AudioPlayer } from "../../../src/components/AudioPlayer";
 import type { SentenceEntry, Category } from "../../../src/types";
@@ -35,12 +37,16 @@ function makeNewId() {
 export default function SentenceDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const navigation = useNavigation();
   const isNew = id === "new";
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(isNew ? null : id);
   const [recordingLang, setRecordingLang] = useState<"english" | "korean" | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  // autoSavedId: new sentence was auto-saved (DB row exists) but user hasn't explicitly confirmed
+  const [autoSavedId, setAutoSavedId] = useState<string | null>(null);
 
   const [englishText, setEnglishText] = useState("");
   const [koreanText, setKoreanText] = useState("");
@@ -53,9 +59,72 @@ export default function SentenceDetail() {
   const [enAudio, setEnAudio] = useState<SentenceEntry["englishAudio"]>({ type: "tts" });
   const [koAudio, setKoAudio] = useState<SentenceEntry["koreanAudio"]>({ type: "tts" });
 
+  // Refs so AppState / beforeRemove handlers always see latest values
+  const isDirtyRef = useRef(false);
+  const autoSavedIdRef = useRef<string | null>(null);
+  const enAudioRef = useRef<SentenceEntry["englishAudio"]>({ type: "tts" });
+  const koAudioRef = useRef<SentenceEntry["koreanAudio"]>({ type: "tts" });
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => { autoSavedIdRef.current = autoSavedId; }, [autoSavedId]);
+  useEffect(() => { enAudioRef.current = enAudio; }, [enAudio]);
+  useEffect(() => { koAudioRef.current = koAudio; }, [koAudio]);
+
   useEffect(() => {
     if (!isNew && id) loadSentence(id);
   }, [id]);
+
+  async function cleanupDraft() {
+    const draftId = autoSavedIdRef.current;
+    if (!draftId) return;
+    try {
+      const en = enAudioRef.current;
+      const ko = koAudioRef.current;
+      if (en?.type === "file") await FileSystem.deleteAsync(en.uri, { idempotent: true });
+      if (ko?.type === "file") await FileSystem.deleteAsync(ko.uri, { idempotent: true });
+      await deleteSentence(draftId);
+    } catch {}
+    setAutoSavedId(null);
+    autoSavedIdRef.current = null;
+  }
+
+  // Delete draft when app goes to background
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background") cleanupDraft();
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Intercept back navigation when there are unsaved changes
+  useEffect(() => {
+    const unsubscribe = (navigation as any).addListener("beforeRemove", (e: any) => {
+      if (!isDirtyRef.current && !autoSavedIdRef.current) return;
+      e.preventDefault();
+      Alert.alert(
+        "저장하지 않은 내용",
+        "변경 내용을 저장하지 않고 나가시겠어요?",
+        [
+          { text: "계속 편집", style: "cancel" },
+          {
+            text: "버리기",
+            style: "destructive",
+            onPress: async () => {
+              await cleanupDraft();
+              navigation.dispatch(e.data.action);
+            },
+          },
+          {
+            text: "저장",
+            onPress: async () => {
+              const ok = await doSave(true);
+              if (ok) navigation.dispatch(e.data.action);
+            },
+          },
+        ]
+      );
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   async function loadSentence(sentenceId: string) {
     setLoading(true);
@@ -75,10 +144,10 @@ export default function SentenceDetail() {
     setLoading(false);
   }
 
-  async function handleSave() {
+  async function doSave(silent = false): Promise<boolean> {
     if (!englishText.trim()) {
       Alert.alert("오류", "영어 원문을 입력해주세요.");
-      return;
+      return false;
     }
     setSaving(true);
     const sentenceId = savedId ?? makeNewId();
@@ -98,17 +167,27 @@ export default function SentenceDetail() {
     try {
       await upsertSentence(entry);
       setSavedId(sentenceId);
-      Alert.alert(
-        "저장됨",
-        isNew ? "새 문장이 추가됐습니다." : "수정 내용이 저장됐습니다.",
-        [{ text: "확인", onPress: () => { if (isNew) router.back(); } }]
-      );
+      setIsDirty(false);
+      isDirtyRef.current = false;
+      setAutoSavedId(null);
+      autoSavedIdRef.current = null;
+      if (!silent) {
+        Alert.alert(
+          "저장됨",
+          isNew ? "새 문장이 추가됐습니다." : "수정 내용이 저장됐습니다.",
+          [{ text: "확인", onPress: () => { if (isNew) router.back(); } }]
+        );
+      }
+      return true;
     } catch (e: any) {
       Alert.alert("오류", `저장 실패: ${e?.message ?? String(e)}`);
+      return false;
     } finally {
       setSaving(false);
     }
   }
+
+  function handleSave() { doSave(); }
 
   async function handleRecordPress(lang: "english" | "korean") {
     if (recordingLang === lang) {
@@ -139,6 +218,8 @@ export default function SentenceDetail() {
       try {
         await upsertSentence(entry);
         setSavedId(sentenceId);
+        setAutoSavedId(sentenceId);
+        autoSavedIdRef.current = sentenceId;
       } catch (e: any) {
         Alert.alert("오류", `저장 실패: ${e?.message ?? String(e)}`);
         setSaving(false);
@@ -185,7 +266,7 @@ export default function SentenceDetail() {
               <TouchableOpacity
                 key={c.value}
                 style={[styles.chip, category === c.value && styles.chipActive]}
-                onPress={() => setCategory(c.value)}
+                onPress={() => { setCategory(c.value); setIsDirty(true); }}
               >
                 <Text style={[styles.chipText, category === c.value && styles.chipTextActive]}>
                   {c.label}
@@ -203,7 +284,7 @@ export default function SentenceDetail() {
               <TouchableOpacity
                 key={d.value}
                 style={[styles.chip, difficulty === d.value && styles.chipActive]}
-                onPress={() => setDifficulty(d.value)}
+                onPress={() => { setDifficulty(d.value); setIsDirty(true); }}
               >
                 <Text style={[styles.chipText, difficulty === d.value && styles.chipTextActive]}>
                   {d.label}
@@ -225,7 +306,7 @@ export default function SentenceDetail() {
             placeholder="영어 문장을 입력하세요"
             placeholderTextColor="#9CA3AF"
             value={englishText}
-            onChangeText={setEnglishText}
+            onChangeText={(v) => { setEnglishText(v); setIsDirty(true); }}
           />
           {englishText.trim() ? (
             <View style={styles.audioRow}>
@@ -265,7 +346,7 @@ export default function SentenceDetail() {
             placeholder="한국어 문장을 입력하세요"
             placeholderTextColor="#9CA3AF"
             value={koreanText}
-            onChangeText={setKoreanText}
+            onChangeText={(v) => { setKoreanText(v); setIsDirty(true); }}
           />
           {koreanText.trim() ? (
             <View style={styles.audioRow}>
@@ -302,7 +383,7 @@ export default function SentenceDetail() {
             placeholder="영→한 Step 5에 표시될 모범 통역문"
             placeholderTextColor="#9CA3AF"
             value={modelKorean}
-            onChangeText={setModelKorean}
+            onChangeText={(v) => { setModelKorean(v); setIsDirty(true); }}
           />
         </View>
 
@@ -314,7 +395,7 @@ export default function SentenceDetail() {
             placeholder="한→영 Step 5에 표시될 모범 통역문"
             placeholderTextColor="#9CA3AF"
             value={modelEnglish}
-            onChangeText={setModelEnglish}
+            onChangeText={(v) => { setModelEnglish(v); setIsDirty(true); }}
           />
         </View>
 
@@ -328,7 +409,7 @@ export default function SentenceDetail() {
             placeholder="예: idiom, passive, business"
             placeholderTextColor="#9CA3AF"
             value={tags}
-            onChangeText={setTags}
+            onChangeText={(v) => { setTags(v); setIsDirty(true); }}
           />
         </View>
 
@@ -341,7 +422,7 @@ export default function SentenceDetail() {
             placeholder="주의할 표현, 자주 틀리는 부분 등..."
             placeholderTextColor="#9CA3AF"
             value={notes}
-            onChangeText={setNotes}
+            onChangeText={(v) => { setNotes(v); setIsDirty(true); }}
           />
         </View>
 
