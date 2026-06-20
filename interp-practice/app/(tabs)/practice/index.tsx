@@ -135,7 +135,14 @@ export default function PracticeHome() {
 
       {/* 오늘의 학습 큐 */}
       <View style={styles.queueCard}>
-        <Text style={styles.queueTitle}>오늘의 학습</Text>
+        <View style={styles.queueTitleRow}>
+          <Text style={styles.queueTitle}>오늘의 학습</Text>
+          {totalCount > 0 && (
+            <View style={styles.totalBadge}>
+              <Text style={styles.totalBadgeText}>{totalCount}문장</Text>
+            </View>
+          )}
+        </View>
 
         {/* 새 문장 필터 */}
         <View style={styles.filterSection}>
@@ -177,22 +184,6 @@ export default function PracticeHome() {
           <Text style={styles.newLimit}>새 문장은 최대 {practiceSettings.dailyNewLimit}개까지 추가됩니다</Text>
         </View>
 
-        {totalCount > 0 && (
-          <View style={styles.queueSummary}>
-            <View style={styles.queueBadge}>
-              <Text style={styles.queueBadgeNum}>{dueCount}</Text>
-              <Text style={styles.queueBadgeLabel}>복습</Text>
-            </View>
-            <Text style={styles.queuePlus}>+</Text>
-            <View style={[styles.queueBadge, styles.queueBadgeNew]}>
-              <Text style={[styles.queueBadgeNum, styles.queueBadgeNumNew]}>{newCount}</Text>
-              <Text style={[styles.queueBadgeLabel, styles.queueBadgeLabelNew]}>새 문장</Text>
-            </View>
-            <Text style={styles.queueEquals}>=</Text>
-            <Text style={styles.queueTotal}>{totalCount}문장</Text>
-          </View>
-        )}
-
         <TouchableOpacity
           style={[styles.startBtn, totalCount === 0 && styles.startBtnDisabled]}
           onPress={handleStart}
@@ -200,6 +191,7 @@ export default function PracticeHome() {
         >
           <Text style={styles.startBtnText}>
             {totalCount === 0 ? "학습할 문장 없음" : "시작하기 →"}
+
           </Text>
         </TouchableOpacity>
       </View>
@@ -251,7 +243,15 @@ const styles = StyleSheet.create({
     gap: 20,
     marginBottom: 16,
   },
+  queueTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   queueTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
+  totalBadge: {
+    backgroundColor: "#1A56DB",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  totalBadgeText: { fontSize: 12, fontWeight: "700", color: "#FFFFFF" },
   queueSummary: {
     flexDirection: "row",
     alignItems: "center",
