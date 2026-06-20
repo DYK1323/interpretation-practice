@@ -12,11 +12,12 @@ import {
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import * as FileSystem from "expo-file-system";
 import { Ionicons } from "@expo/vector-icons";
-import { getSentenceById, upsertSentence, updateSentenceAudio } from "../../src/db/sentences";
+import { getSentenceById, upsertSentence, updateSentenceAudio, deleteSentence } from "../../src/db/sentences";
 import { getAllSettings } from "../../src/db/settings";
+import { useSessionStore } from "../../src/features/session/useSessionStore";
 import { RecordButton } from "../../src/components/RecordButton";
 import { AudioPlayer } from "../../src/components/AudioPlayer";
-import { CATEGORIES } from "../../src/constants";
+import { CATEGORIES, FOREIGN_LANGUAGE_DIRECTIONS, DIRECTION_LABELS } from "../../src/constants";
 import type { SentenceEntry, Category, ForeignLanguage } from "../../src/types/index";
 
 const DIFFICULTIES: { value: 1 | 2 | 3; label: string }[] = [
@@ -34,6 +35,7 @@ type RecordingLang = "english" | "korean" | "japanese" | "chinese";
 export default function SentenceEdit() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { startQueue } = useSessionStore();
   const isNew = id === "new";
   const savingRef = useRef(false);
 
@@ -190,6 +192,62 @@ export default function SentenceEdit() {
       setSaving(false);
       savingRef.current = false;
     }
+  }
+
+  function buildCurrentEntry(): SentenceEntry {
+    return {
+      id: savedId!,
+      category,
+      difficulty,
+      foreignLanguage,
+      englishText: foreignLanguage === "en" ? englishText.trim() : "",
+      koreanText: koreanText.trim() || undefined,
+      englishAudio: foreignLanguage === "en" ? enAudio : { type: "tts" },
+      koreanAudio: koAudio,
+      japaneseText: foreignLanguage === "ja" ? (japaneseText.trim() || undefined) : undefined,
+      japaneseAudio: foreignLanguage === "ja" ? jaAudio : undefined,
+      chineseText: foreignLanguage === "zh" ? (chineseText.trim() || undefined) : undefined,
+      chineseAudio: foreignLanguage === "zh" ? zhAudio : undefined,
+      modelKorean: modelKorean.trim() || undefined,
+      modelEnglish: foreignLanguage === "en" ? (modelEnglish.trim() || undefined) : undefined,
+      modelJapanese: foreignLanguage === "ja" ? (modelJapanese.trim() || undefined) : undefined,
+      modelChinese: foreignLanguage === "zh" ? (modelChinese.trim() || undefined) : undefined,
+      tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+      notes: notes.trim() || undefined,
+    };
+  }
+
+  function handlePractice() {
+    const entry = buildCurrentEntry();
+    const dirs = FOREIGN_LANGUAGE_DIRECTIONS[foreignLanguage];
+    const canBwd = !!koreanText.trim();
+    const go = (dir: typeof dirs[number]) => {
+      startQueue([{ sentence: entry, direction: dir }]);
+      router.push("/practice/session");
+    };
+    if (canBwd) {
+      Alert.alert("연습 방향 선택", undefined, [
+        { text: DIRECTION_LABELS[dirs[0]], onPress: () => go(dirs[0]) },
+        { text: DIRECTION_LABELS[dirs[1]], onPress: () => go(dirs[1]) },
+        { text: "취소", style: "cancel" },
+      ]);
+    } else {
+      go(dirs[0]);
+    }
+  }
+
+  function handleDelete() {
+    Alert.alert("문장 삭제", "이 문장을 삭제할까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: async () => {
+          await deleteSentence(savedId!);
+          router.back();
+        },
+      },
+    ]);
   }
 
   async function handleRecordingComplete(uri: string) {
@@ -448,6 +506,18 @@ export default function SentenceEdit() {
             <Text style={styles.saveBtnText}>{isNew ? "추가하기" : "저장하기"}</Text>
           )}
         </TouchableOpacity>
+
+        {!isNew && savedId && (
+          <TouchableOpacity style={styles.practiceBtn} onPress={handlePractice}>
+            <Text style={styles.practiceBtnText}>연습하기</Text>
+          </TouchableOpacity>
+        )}
+
+        {!isNew && savedId && (
+          <TouchableOpacity style={styles.deleteLink} onPress={handleDelete}>
+            <Text style={styles.deleteLinkText}>문장 삭제</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </>
   );
@@ -518,4 +588,14 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.6 },
   saveBtnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
+  practiceBtn: {
+    backgroundColor: "#059669",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  practiceBtnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
+  deleteLink: { alignItems: "center", paddingVertical: 16, marginTop: 4 },
+  deleteLinkText: { fontSize: 14, color: "#EF4444" },
 });

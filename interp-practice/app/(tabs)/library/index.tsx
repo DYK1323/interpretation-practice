@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
-  Alert,
   ActivityIndicator,
   TextInput,
   ScrollView,
@@ -14,12 +13,11 @@ import {
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { getAllSentences, deleteSentence } from "../../../src/db/sentences";
+import { getAllSentences } from "../../../src/db/sentences";
 import { getAllSettings } from "../../../src/db/settings";
 import { getProgressSummaryByIds } from "../../../src/db/progress";
-import { useSessionStore } from "../../../src/features/session/useSessionStore";
-import { CATEGORIES, CATEGORY_LABELS, FOREIGN_LANGUAGE_DIRECTIONS, DIRECTION_LABELS } from "../../../src/constants";
-import type { SentenceEntry, Category, Direction } from "../../../src/types/index";
+import { CATEGORIES, CATEGORY_LABELS } from "../../../src/constants";
+import type { SentenceEntry, Category } from "../../../src/types/index";
 
 const DIFFICULTIES = [
   { value: 1 as const, label: "★☆☆" },
@@ -43,7 +41,6 @@ function daysUntil(ts: number): string {
 
 export default function LibraryIndex() {
   const router = useRouter();
-  const { startQueue } = useSessionStore();
   const [sentences, setSentences] = useState<SentenceEntry[]>([]);
   const [progressMap, setProgressMap] = useState<Record<string, { lastStudiedAt: number | null; nextReviewDate: number | null }>>({});
   const [loading, setLoading] = useState(true);
@@ -72,35 +69,6 @@ export default function LibraryIndex() {
     const prog = await getProgressSummaryByIds(data.map((x) => x.id));
     setProgressMap(prog);
     setLoading(false);
-  }
-
-  function handlePractice(item: SentenceEntry) {
-    const dirs = FOREIGN_LANGUAGE_DIRECTIONS[item.foreignLanguage];
-    const fwdDir = dirs[0];
-    const bwdDir = dirs[1];
-    const canBwd = !!item.koreanText;
-    if (canBwd) {
-      Alert.alert("연습 방향 선택", undefined, [
-        { text: DIRECTION_LABELS[fwdDir], onPress: () => startAndNavigate(item, fwdDir) },
-        { text: DIRECTION_LABELS[bwdDir], onPress: () => startAndNavigate(item, bwdDir) },
-        { text: "취소", style: "cancel" },
-      ]);
-    } else {
-      startAndNavigate(item, fwdDir);
-    }
-  }
-
-  function startAndNavigate(item: SentenceEntry, direction: Direction) {
-    startQueue([{ sentence: item, direction }]);
-    router.push("/practice/session");
-  }
-
-  function handleLongPress(item: SentenceEntry) {
-    Alert.alert("", undefined, [
-      { text: "연습하기", onPress: () => handlePractice(item) },
-      { text: "삭제", style: "destructive", onPress: () => handleDelete(item.id) },
-      { text: "취소", style: "cancel" },
-    ]);
   }
 
   const allTags = useMemo(() => {
@@ -149,20 +117,6 @@ export default function LibraryIndex() {
     setDraftDiff(null);
     setDraftCat(null);
     setDraftTag(null);
-  }
-
-  function handleDelete(id: string) {
-    Alert.alert("문장 삭제", "이 문장을 삭제할까요?", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: async () => {
-          await deleteSentence(id);
-          setSentences((prev) => prev.filter((s) => s.id !== id));
-        },
-      },
-    ]);
   }
 
   return (
@@ -238,9 +192,6 @@ export default function LibraryIndex() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
-          ListFooterComponent={
-            <Text style={styles.deleteHint}>길게 누르면 연습 시작 · 삭제 옵션</Text>
-          }
           renderItem={({ item }) => {
             const displayTags = item.tags.slice(0, 3);
             const extraCount = item.tags.length - 3;
@@ -253,7 +204,6 @@ export default function LibraryIndex() {
               <TouchableOpacity
                 style={styles.card}
                 onPress={() => router.push(`/library-edit/${item.id}`)}
-                onLongPress={() => handleLongPress(item)}
               >
                 <View style={styles.cardHeader}>
                   <View style={styles.badges}>
@@ -481,12 +431,6 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
   emptyDesc: { fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 22 },
   list: { padding: 16, gap: 10, paddingBottom: 32 },
-  deleteHint: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    textAlign: "center",
-    paddingVertical: 8,
-  },
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
