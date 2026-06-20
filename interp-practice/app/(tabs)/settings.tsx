@@ -185,8 +185,8 @@ export default function SettingsScreen() {
     <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-      {/* 구글 시트에서 가져오기 */}
-      <View style={styles.group}>
+      {/* 구글 시트에서 가져오기 — 양방향 동기화 미설정 시에만 표시 */}
+      {!scriptSyncUrl && <View style={styles.group}>
         <Text style={styles.groupTitle}>구글 시트에서 가져오기</Text>
         <Text style={styles.desc}>
           시트를 "링크 있는 모든 사용자 보기"로 공유한 뒤 링크를 붙여넣으세요.
@@ -210,7 +210,7 @@ export default function SettingsScreen() {
             : <Text style={styles.actionBtnText}>시트에서 문장 가져오기</Text>
           }
         </TouchableOpacity>
-      </View>
+      </View>}
 
       {/* 양방향 동기화 */}
       <View style={styles.group}>

@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  KeyboardAvoidingView,
   StyleSheet,
   Alert,
   ActivityIndicator,
@@ -125,7 +126,11 @@ export default function SyncSetupScreen() {
           headerBackTitle: "설정",
         }}
       />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
         <View style={styles.infoBox}>
           <Text style={styles.infoText}>
@@ -218,6 +223,7 @@ export default function SyncSetupScreen() {
         </View>
 
       </ScrollView>
+      </KeyboardAvoidingView>
     </>
   );
 }
