@@ -103,11 +103,11 @@ export default function SettingsScreen() {
     try {
       const { imported, failed } = await syncFromSheetUrl(url);
       Alert.alert(
-        "동기화 완료",
+        "가져오기 완료",
         `${imported}개 문장 가져옴${failed > 0 ? `, ${failed}개 실패` : ""}`
       );
     } catch (e: any) {
-      Alert.alert("동기화 실패", e?.message ?? "알 수 없는 오류");
+      Alert.alert("가져오기 실패", e?.message ?? "알 수 없는 오류");
     } finally {
       setSyncing(false);
     }
@@ -136,9 +136,9 @@ export default function SettingsScreen() {
     <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-      {/* 구글 시트 동기화 */}
+      {/* 구글 시트에서 가져오기 */}
       <View style={styles.group}>
-        <Text style={styles.groupTitle}>구글 시트 동기화</Text>
+        <Text style={styles.groupTitle}>구글 시트에서 가져오기</Text>
         <Text style={styles.desc}>
           시트를 "링크 있는 모든 사용자 보기"로 공유한 뒤 링크를 붙여넣으세요.
         </Text>
@@ -173,7 +173,7 @@ export default function SettingsScreen() {
       <View style={styles.group}>
         <Text style={styles.groupTitle}>데이터 내보내기</Text>
         <Text style={styles.desc}>
-          문장과 학습 진도(복습 일정·횟수)를 CSV로 내보냅니다. 구글 드라이브에 저장해두면 폰을 바꿔도 구글 시트 동기화로 복원할 수 있습니다.
+          문장과 학습 진도(복습 일정·횟수)를 CSV로 내보냅니다. 구글 드라이브에 저장해두면 폰을 바꿔도 시트 가져오기로 복원할 수 있습니다.
         </Text>
         <TouchableOpacity
           style={[styles.actionBtn, styles.actionBtnSecondary, exporting && styles.actionBtnDisabled]}
@@ -367,7 +367,7 @@ export default function SettingsScreen() {
             <View style={styles.stepList}>
               <Text style={styles.stepItem}>① 공유 창이 열리면 <Text style={styles.stepEmphasis}>구글 드라이브</Text>를 선택하세요.</Text>
               <Text style={styles.stepItem}>② 드라이브에 저장해 두면 폰을 바꿔도 복원할 수 있습니다.</Text>
-              <Text style={styles.stepItem}>③ 복원할 때는 파일을 구글 시트로 열어 동기화 URL로 입력하세요.</Text>
+              <Text style={styles.stepItem}>③ 복원할 때는 파일을 구글 시트로 열어 가져오기 URL로 입력하세요.</Text>
             </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setExportGuideVisible(false)}>
@@ -425,7 +425,7 @@ export default function SettingsScreen() {
                   <Text style={styles.modalCancelText}>취소</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSync}>
-                  <Text style={styles.modalConfirmText}>동기화 시작</Text>
+                  <Text style={styles.modalConfirmText}>가져오기 시작</Text>
                 </TouchableOpacity>
               </View>
             </View>
