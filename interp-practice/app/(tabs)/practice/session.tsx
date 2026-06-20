@@ -98,12 +98,30 @@ export default function SessionScreen() {
   if (!sentence) return null;
   const s = sentence;
 
-  const sourceText = direction === "en-ko" ? s.englishText : s.koreanText ?? "";
-  const sourceLang = direction === "en-ko" ? "en-US" : "ko-KR";
-  const sourceAudio = direction === "en-ko" ? s.englishAudio : s.koreanAudio;
-  const modelInterp = direction === "en-ko"
-    ? (s.modelKorean ?? s.koreanText)
-    : (s.modelEnglish ?? s.englishText);
+  function getSourceInfo() {
+    switch (direction) {
+      case "en-ko": return { text: s.englishText,       audio: s.englishAudio,  lang: "en-US" };
+      case "ko-en":
+      case "ko-ja":
+      case "ko-zh": return { text: s.koreanText ?? "",  audio: s.koreanAudio,   lang: "ko-KR" };
+      case "ja-ko": return { text: s.japaneseText ?? "", audio: s.japaneseAudio, lang: "ja-JP" };
+      case "zh-ko": return { text: s.chineseText ?? "",  audio: s.chineseAudio,  lang: "zh-CN" };
+    }
+  }
+
+  function getModelInterp() {
+    switch (direction) {
+      case "en-ko":
+      case "ja-ko":
+      case "zh-ko": return s.modelKorean ?? s.koreanText;
+      case "ko-en": return s.modelEnglish ?? s.englishText;
+      case "ko-ja": return s.modelJapanese ?? s.japaneseText;
+      case "ko-zh": return s.modelChinese ?? s.chineseText;
+    }
+  }
+
+  const { text: sourceText, audio: sourceAudio, lang: sourceLang } = getSourceInfo();
+  const modelInterp = getModelInterp();
   if (!sourceText) return null;
 
   function handleInterpComplete(uri: string) {

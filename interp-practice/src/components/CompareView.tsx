@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import type { Direction } from "../types/index";
+import { LANG_LABEL } from "../constants";
 
 interface Props {
   originalText: string;
@@ -15,9 +16,10 @@ export function CompareView({
   direction,
   modelInterpretation,
 }: Props) {
-  const originalLabel = direction === "en-ko" ? "원문 (영어)" : "원문 (한국어)";
-  const modelLabel = direction === "en-ko" ? "통역 예시 (한국어)" : "통역 예시 (영어)";
-  const backInterpLabel = direction === "en-ko" ? "내 재통역 (영어)" : "내 재통역 (한국어)";
+  const [src, tgt] = direction.split("-");
+  const originalLabel   = `원문 (${LANG_LABEL[src]})`;
+  const modelLabel      = `통역 예시 (${LANG_LABEL[tgt]})`;
+  const backInterpLabel = `내 재통역 (${LANG_LABEL[src]})`;
 
   return (
     <View style={styles.container}>
