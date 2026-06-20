@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import React from "react";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import type { Direction } from "../types";
 
 interface Props {
@@ -15,11 +15,9 @@ export function CompareView({
   direction,
   modelInterpretation,
 }: Props) {
-  const [showModel, setShowModel] = useState(false);
-
   const originalLabel = direction === "en-ko" ? "원문 (영어)" : "원문 (한국어)";
-  const backInterpLabel = direction === "en-ko" ? "내 재통역 (영어)" : "내 재통역 (한국어)";
   const modelLabel = direction === "en-ko" ? "모범 한국어 통역" : "모범 영어 통역";
+  const backInterpLabel = direction === "en-ko" ? "내 재통역 (영어)" : "내 재통역 (한국어)";
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -27,6 +25,16 @@ export function CompareView({
         <Text style={styles.blockLabel}>{originalLabel}</Text>
         <Text style={styles.originalText}>{originalText}</Text>
       </View>
+
+      {modelInterpretation && (
+        <>
+          <View style={styles.divider} />
+          <View style={styles.modelBlock}>
+            <Text style={styles.blockLabel}>{modelLabel}</Text>
+            <Text style={styles.modelText}>{modelInterpretation}</Text>
+          </View>
+        </>
+      )}
 
       <View style={styles.divider} />
 
@@ -36,27 +44,6 @@ export function CompareView({
           {backInterpText || "인식된 텍스트 없음"}
         </Text>
       </View>
-
-      {modelInterpretation && (
-        <>
-          <View style={styles.divider} />
-          <TouchableOpacity
-            style={styles.modelToggle}
-            onPress={() => setShowModel((v) => !v)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.modelToggleText}>
-              {showModel ? "모범 통역 숨기기 ▲" : "모범 통역 보기 ▼"}
-            </Text>
-          </TouchableOpacity>
-          {showModel && (
-            <View style={styles.modelBlock}>
-              <Text style={styles.blockLabel}>{modelLabel}</Text>
-              <Text style={styles.modelText}>{modelInterpretation}</Text>
-            </View>
-          )}
-        </>
-      )}
     </ScrollView>
   );
 }
@@ -98,15 +85,6 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: "#F3F4F6",
-  },
-  modelToggle: {
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  modelToggleText: {
-    fontSize: 14,
-    color: "#1A56DB",
-    fontWeight: "600",
   },
   modelBlock: {
     gap: 8,
