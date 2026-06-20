@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  AppState,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useNavigation } from "expo-router";
 import * as FileSystem from "expo-file-system";
@@ -87,13 +86,6 @@ export default function SentenceDetail() {
     autoSavedIdRef.current = null;
   }
 
-  // Delete draft when app goes to background
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "background") cleanupDraft();
-    });
-    return () => sub.remove();
-  }, []);
 
   // Intercept back navigation when there are unsaved changes
   useEffect(() => {
