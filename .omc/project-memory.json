@@ -138,6 +138,18 @@
       "accessCount": 1,
       "lastAccessed": 1781959040271,
       "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 1,
+      "lastAccessed": 1781964588826,
+      "type": "directory"
+    },
+    {
+      "path": "desktop-app\\src-tauri\\tauri.conf.json",
+      "accessCount": 1,
+      "lastAccessed": 1781964749559,
+      "type": "file"
     }
   ],
   "userDirectives": []
