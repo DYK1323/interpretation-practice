@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"ls \\\"c:\\\\Users\\\\DAYOUNG\\\\260522\\\\desktop-app\\\\src-tauri\\\\\\\" && echo \\\"---\\\" && ls \\\"c:\\\\Users\\\\DAYOUNG\\\\260522\\\\desktop-app\\\\src-tauri\\\\capabilities\\\" 2>/dev/null || echo \\\"(no capabilitie...",
-  "error": "Exit code 2\n/usr/bin/bash: eval: line 1: syntax error near unexpected token `('\n/usr/bin/bash: eval: line 1: `ls \"c:\\Users\\DAYOUNG\\260522\\desktop-app\\src-tauri\\\" && echo \"---\" && ls \"c:\\Users\\DAYOUNG\\260522\\desktop-app\\src-tauri\\capabilities\" 2>/dev/null || echo \"(no capabilities dir)\"'",
-  "timestamp": "2026-06-20T12:43:58.049Z",
+  "tool_name": "PowerShell",
+  "tool_input_preview": "{\"command\":\"cd \\\"c:\\\\Users\\\\DAYOUNG\\\\260522\\\\desktop-app\\\"; npm run tauri build 2>&1\",\"timeout\":600000,\"description\":\"Run Tauri build\"}",
+  "error": "Exit code 1\n> interp-practice-desktop@1.0.0 tauri\n> tauri build\n\n        Info Looking up installed tauri packages to check mismatched versions...\nFound version mismatched Tauri packages. Make sure the NPM package and Rust crate versions are on the same major/minor releases:\ntauri (v2.9.5) : @tauri-apps/api (v2.11.1)\n       Error Found version mismatched Tauri packages. Make sure the NPM package and Rust crate versions are on the same major/minor releases:\ntauri (v2.9.5) : @tauri-apps/api (v2.11....",
+  "timestamp": "2026-06-20T13:00:43.499Z",
   "retry_count": 1
 }

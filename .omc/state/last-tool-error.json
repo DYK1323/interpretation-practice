@@ -1,0 +1,7 @@
+{
+  "tool_name": "PowerShell",
+  "tool_input_preview": "{\"command\":\"cd \\\"c:\\\\Users\\\\DAYOUNG\\\\260522\\\\desktop-app\\\" && npm install --save-dev @tauri-apps/cli@^2\",\"timeout\":60000,\"description\":\"Install @tauri-apps/cli dev dependency\"}",
+  "error": "Exit code 1\nAt line:1 char:42\r\n+ cd \"c:\\Users\\DAYOUNG\\260522\\desktop-app\" && npm install --save-dev @t ...\r\n+                                          ~~\r\nThe token '&&' is not a valid statement separator in this version.\r\n    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException\r\n    + FullyQualifiedErrorId : InvalidEndOfLine",
+  "timestamp": "2026-06-20T13:00:24.476Z",
+  "retry_count": 1
+}
