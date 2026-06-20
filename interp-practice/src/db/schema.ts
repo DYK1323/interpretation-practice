@@ -58,6 +58,9 @@ async function _runInit(): Promise<void> {
   if (!sentenceCols.some(c => c.name === "notes")) {
     await database.execAsync(`ALTER TABLE sentences ADD COLUMN notes TEXT`);
   }
+  if (!sentenceCols.some(c => c.name === "is_draft")) {
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN is_draft INTEGER NOT NULL DEFAULT 0`);
+  }
 
   const resultCols = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(session_results)`);
   if (!resultCols.some(c => c.name === "back_interp_recording_uri")) {

@@ -208,7 +208,7 @@ export default function SentenceDetail() {
         notes: notes.trim() || undefined,
       };
       try {
-        await upsertSentence(entry);
+        await upsertSentence(entry, { isDraft: true });
         setSavedId(sentenceId);
         setAutoSavedId(sentenceId);
         autoSavedIdRef.current = sentenceId;

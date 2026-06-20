@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { initDB } from "../src/db/schema";
+import { cleanupDrafts } from "../src/db/sentences";
 import { requestAllPermissions } from "../src/utils/permissions";
 import * as Updates from "expo-updates";
 
@@ -19,7 +20,7 @@ async function checkAndApplyUpdate() {
 
 export default function RootLayout() {
   useEffect(() => {
-    initDB().catch(console.error);
+    initDB().then(() => cleanupDrafts()).catch(console.error);
     requestAllPermissions().catch(console.error);
     if (!__DEV__) {
       checkAndApplyUpdate();

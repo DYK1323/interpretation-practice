@@ -60,19 +60,20 @@ export async function getSentenceById(id: string): Promise<SentenceEntry | null>
   return row ? rowToEntry(row) : null;
 }
 
-export async function upsertSentence(entry: SentenceEntry, opts?: { keepDifficulty?: boolean }): Promise<void> {
+export async function upsertSentence(
+  entry: SentenceEntry,
+  opts?: { keepDifficulty?: boolean; isDraft?: boolean }
+): Promise<void> {
   const db = await getDB();
-  // When keepDifficulty=true (CSV import without difficulty column):
-  //   INSERT: COALESCE(null, 2) = 2 (default for new sentences)
-  //   UPDATE: COALESCE(null, existing) = keeps practiced difficulty
   const diffParam = opts?.keepDifficulty ? null : entry.difficulty;
+  const isDraft = opts?.isDraft ? 1 : 0;
   await db.runAsync(
     `INSERT INTO sentences (
       id, category, difficulty, english_text, korean_text,
       english_audio_type, english_audio_uri,
       korean_audio_type, korean_audio_uri,
-      model_korean, model_english, tags, duration_seconds, notes
-    ) VALUES (?, ?, COALESCE(?, 2), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      model_korean, model_english, tags, duration_seconds, notes, is_draft
+    ) VALUES (?, ?, COALESCE(?, 2), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       category = excluded.category,
       difficulty = COALESCE(excluded.difficulty, sentences.difficulty),
@@ -86,7 +87,8 @@ export async function upsertSentence(entry: SentenceEntry, opts?: { keepDifficul
       model_english = excluded.model_english,
       tags = excluded.tags,
       duration_seconds = excluded.duration_seconds,
-      notes = excluded.notes`,
+      notes = excluded.notes,
+      is_draft = excluded.is_draft`,
     [
       entry.id,
       entry.category,
@@ -102,8 +104,28 @@ export async function upsertSentence(entry: SentenceEntry, opts?: { keepDifficul
       JSON.stringify(entry.tags),
       entry.durationSeconds ?? null,
       entry.notes ?? null,
+      isDraft,
     ]
   );
+}
+
+export async function cleanupDrafts(): Promise<void> {
+  const db = await getDB();
+  const drafts = await db.getAllAsync<{ id: string; english_audio_uri: string | null; korean_audio_uri: string | null }>(
+    "SELECT id, english_audio_uri, korean_audio_uri FROM sentences WHERE is_draft = 1"
+  );
+  if (drafts.length === 0) return;
+
+  const { deleteAsync } = await import("expo-file-system");
+  for (const row of drafts) {
+    if (row.english_audio_uri) {
+      try { await deleteAsync(row.english_audio_uri, { idempotent: true }); } catch {}
+    }
+    if (row.korean_audio_uri) {
+      try { await deleteAsync(row.korean_audio_uri, { idempotent: true }); } catch {}
+    }
+  }
+  await db.runAsync("DELETE FROM sentences WHERE is_draft = 1");
 }
 
 export async function updateSentenceDifficulty(id: string, difficulty: 1 | 2 | 3): Promise<void> {
