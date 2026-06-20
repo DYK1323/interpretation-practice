@@ -16,8 +16,10 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { getAllSentences, deleteSentence } from "../../../src/db/sentences";
 import { getAllSettings } from "../../../src/db/settings";
-import { CATEGORIES, CATEGORY_LABELS } from "../../../src/constants";
-import type { SentenceEntry, Category } from "../../../src/types/index";
+import { getProgressSummaryByIds } from "../../../src/db/progress";
+import { useSessionStore } from "../../../src/features/session/useSessionStore";
+import { CATEGORIES, CATEGORY_LABELS, FOREIGN_LANGUAGE_DIRECTIONS, DIRECTION_LABELS } from "../../../src/constants";
+import type { SentenceEntry, Category, Direction } from "../../../src/types/index";
 
 const DIFFICULTIES = [
   { value: 1 as const, label: "★☆☆" },
@@ -25,9 +27,25 @@ const DIFFICULTIES = [
   { value: 3 as const, label: "★★★" },
 ];
 
+function daysAgo(ts: number): string {
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  if (days <= 0) return "오늘";
+  if (days === 1) return "어제";
+  return `${days}일 전`;
+}
+
+function daysUntil(ts: number): string {
+  const days = Math.floor((ts - Date.now()) / 86400000);
+  if (days <= 0) return "오늘";
+  if (days === 1) return "내일";
+  return `${days}일 후`;
+}
+
 export default function LibraryIndex() {
   const router = useRouter();
+  const { startQueue } = useSessionStore();
   const [sentences, setSentences] = useState<SentenceEntry[]>([]);
+  const [progressMap, setProgressMap] = useState<Record<string, { lastStudiedAt: number | null; nextReviewDate: number | null }>>({});
   const [loading, setLoading] = useState(true);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
 
@@ -51,7 +69,38 @@ export default function LibraryIndex() {
     const s = await getAllSettings();
     const data = await getAllSentences(s.foreignLanguage);
     setSentences(data);
+    const prog = await getProgressSummaryByIds(data.map((x) => x.id));
+    setProgressMap(prog);
     setLoading(false);
+  }
+
+  function handlePractice(item: SentenceEntry) {
+    const dirs = FOREIGN_LANGUAGE_DIRECTIONS[item.foreignLanguage];
+    const fwdDir = dirs[0];
+    const bwdDir = dirs[1];
+    const canBwd = !!item.koreanText;
+    if (canBwd) {
+      Alert.alert("연습 방향 선택", undefined, [
+        { text: DIRECTION_LABELS[fwdDir], onPress: () => startAndNavigate(item, fwdDir) },
+        { text: DIRECTION_LABELS[bwdDir], onPress: () => startAndNavigate(item, bwdDir) },
+        { text: "취소", style: "cancel" },
+      ]);
+    } else {
+      startAndNavigate(item, fwdDir);
+    }
+  }
+
+  function startAndNavigate(item: SentenceEntry, direction: Direction) {
+    startQueue([{ sentence: item, direction }]);
+    router.push("/practice/session");
+  }
+
+  function handleLongPress(item: SentenceEntry) {
+    Alert.alert("", undefined, [
+      { text: "연습하기", onPress: () => handlePractice(item) },
+      { text: "삭제", style: "destructive", onPress: () => handleDelete(item.id) },
+      { text: "취소", style: "cancel" },
+    ]);
   }
 
   const allTags = useMemo(() => {
@@ -190,7 +239,7 @@ export default function LibraryIndex() {
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
           ListFooterComponent={
-            <Text style={styles.deleteHint}>문장을 길게 누르면 삭제됩니다</Text>
+            <Text style={styles.deleteHint}>길게 누르면 연습 시작 · 삭제 옵션</Text>
           }
           renderItem={({ item }) => {
             const displayTags = item.tags.slice(0, 3);
@@ -199,11 +248,12 @@ export default function LibraryIndex() {
               item.foreignLanguage === "ja" ? (item.japaneseText ?? item.englishText) :
               item.foreignLanguage === "zh" ? (item.chineseText ?? item.englishText) :
               item.englishText;
+            const prog = progressMap[item.id];
             return (
               <TouchableOpacity
                 style={styles.card}
                 onPress={() => router.push(`/library-edit/${item.id}`)}
-                onLongPress={() => handleDelete(item.id)}
+                onLongPress={() => handleLongPress(item)}
               >
                 <View style={styles.cardHeader}>
                   <View style={styles.badges}>
@@ -228,6 +278,21 @@ export default function LibraryIndex() {
                 )}
                 {item.notes && (
                   <Text style={styles.notesPreview} numberOfLines={1}>📝 {item.notes}</Text>
+                )}
+                {prog && (
+                  <View style={styles.progressRow}>
+                    {prog.lastStudiedAt ? (
+                      <Text style={styles.progressText}>마지막 {daysAgo(prog.lastStudiedAt)}</Text>
+                    ) : null}
+                    {prog.nextReviewDate ? (
+                      <Text style={[
+                        styles.progressText,
+                        prog.nextReviewDate <= Date.now() && styles.overdueDot,
+                      ]}>
+                        {prog.lastStudiedAt ? " · " : ""}다음 {daysUntil(prog.nextReviewDate)}
+                      </Text>
+                    ) : null}
+                  </View>
                 )}
               </TouchableOpacity>
             );
@@ -452,6 +517,9 @@ const styles = StyleSheet.create({
   enText: { fontSize: 15, color: "#111827", lineHeight: 22 },
   koText: { fontSize: 14, color: "#6B7280", lineHeight: 20 },
   notesPreview: { fontSize: 12, color: "#92400E", lineHeight: 18 },
+  progressRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 2 },
+  progressText: { fontSize: 12, color: "#9CA3AF" },
+  overdueDot: { color: "#EF4444", fontWeight: "600" },
 
   // 모달
   modalOverlay: {

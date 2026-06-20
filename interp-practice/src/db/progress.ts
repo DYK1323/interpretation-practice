@@ -143,6 +143,31 @@ export async function countNewStudiedToday(): Promise<number> {
   return row?.cnt ?? 0;
 }
 
+export async function getProgressSummaryByIds(
+  sentenceIds: string[]
+): Promise<Record<string, { lastStudiedAt: number | null; nextReviewDate: number | null }>> {
+  if (sentenceIds.length === 0) return {};
+  const db = await getDB();
+  const placeholders = sentenceIds.map(() => "?").join(",");
+  const rows = await db.getAllAsync<any>(
+    `SELECT sentence_id,
+       MAX(last_studied_at) AS last_studied_at,
+       MIN(next_review_date) AS next_review_date
+     FROM sentence_progress
+     WHERE sentence_id IN (${placeholders})
+     GROUP BY sentence_id`,
+    sentenceIds
+  );
+  const map: Record<string, { lastStudiedAt: number | null; nextReviewDate: number | null }> = {};
+  for (const row of rows) {
+    map[row.sentence_id] = {
+      lastStudiedAt: row.last_studied_at ?? null,
+      nextReviewDate: row.next_review_date ?? null,
+    };
+  }
+  return map;
+}
+
 export async function scheduleReview(
   sentenceId: string,
   direction: Direction,
