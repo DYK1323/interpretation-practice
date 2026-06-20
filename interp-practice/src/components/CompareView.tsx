@@ -16,7 +16,7 @@ export function CompareView({
   modelInterpretation,
 }: Props) {
   const originalLabel = direction === "en-ko" ? "원문 (영어)" : "원문 (한국어)";
-  const modelLabel = direction === "en-ko" ? "모범 한국어 통역" : "모범 영어 통역";
+  const modelLabel = direction === "en-ko" ? "통역 예시 (한국어)" : "통역 예시 (영어)";
   const backInterpLabel = direction === "en-ko" ? "내 재통역 (영어)" : "내 재통역 (한국어)";
 
   return (
