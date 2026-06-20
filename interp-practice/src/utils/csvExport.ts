@@ -4,13 +4,20 @@ import { getDB } from "../db/schema";
 import type { SentenceEntry } from "../types";
 
 const HEADERS = [
-  "id", "category", "difficulty",
+  "id", "category", "difficulty", "foreignLanguage",
   "englishText", "koreanText",
   "englishAudioType", "koreanAudioType",
   "englishAudioUri", "koreanAudioUri",
-  "modelKorean", "modelEnglish", "tags", "notes",
+  "japaneseText", "japaneseAudioType", "japaneseAudioUri",
+  "chineseText", "chineseAudioType", "chineseAudioUri",
+  "modelKorean", "modelEnglish", "modelJapanese", "modelChinese",
+  "tags", "notes",
   "enkoNextReviewDate", "enkoIntervalDays", "enkoReviewCount", "enkoLastStudiedAt",
   "koenNextReviewDate", "koenIntervalDays", "koenReviewCount", "koenLastStudiedAt",
+  "jakoNextReviewDate", "jakoIntervalDays", "jakoReviewCount", "jakoLastStudiedAt",
+  "kojaNextReviewDate", "kojaIntervalDays", "kojaReviewCount", "kojaLastStudiedAt",
+  "zhkoNextReviewDate", "zhkoIntervalDays", "zhkoReviewCount", "zhkoLastStudiedAt",
+  "kozhNextReviewDate", "kozhIntervalDays", "kozhReviewCount", "kozhLastStudiedAt",
 ].join(",");
 
 function escape(val: string | number | undefined | null): string {
@@ -31,6 +38,8 @@ function resolveAudio(type: string | null, uri: string | null) {
 function rowToCSV(row: any): string {
   const en = resolveAudio(row.english_audio_type, row.english_audio_uri);
   const ko = resolveAudio(row.korean_audio_type, row.korean_audio_uri);
+  const ja = resolveAudio(row.japanese_audio_type, row.japanese_audio_uri);
+  const zh = resolveAudio(row.chinese_audio_type, row.chinese_audio_uri);
   const tags = (() => {
     try { return (JSON.parse(row.tags ?? "[]") as string[]).join("|"); } catch { return ""; }
   })();
@@ -39,14 +48,23 @@ function rowToCSV(row: any): string {
     escape(row.id),
     escape(row.category),
     String(row.difficulty ?? 2),
+    escape(row.foreign_language ?? "en"),
     escape(row.english_text),
     escape(row.korean_text),
     escape(en.type),
     escape(ko.type),
     escape(en.uri),
     escape(ko.uri),
+    escape(row.japanese_text),
+    escape(ja.type),
+    escape(ja.uri),
+    escape(row.chinese_text),
+    escape(zh.type),
+    escape(zh.uri),
     escape(row.model_korean),
     escape(row.model_english),
+    escape(row.model_japanese),
+    escape(row.model_chinese),
     escape(tags),
     escape(row.notes),
     escape(row.enko_next_review_date),
@@ -57,6 +75,22 @@ function rowToCSV(row: any): string {
     escape(row.koen_interval_days),
     escape(row.koen_review_count),
     escape(row.koen_last_studied_at),
+    escape(row.jako_next_review_date),
+    escape(row.jako_interval_days),
+    escape(row.jako_review_count),
+    escape(row.jako_last_studied_at),
+    escape(row.koja_next_review_date),
+    escape(row.koja_interval_days),
+    escape(row.koja_review_count),
+    escape(row.koja_last_studied_at),
+    escape(row.zhko_next_review_date),
+    escape(row.zhko_interval_days),
+    escape(row.zhko_review_count),
+    escape(row.zhko_last_studied_at),
+    escape(row.kozh_next_review_date),
+    escape(row.kozh_interval_days),
+    escape(row.kozh_review_count),
+    escape(row.kozh_last_studied_at),
   ].join(",");
 }
 
@@ -71,10 +105,30 @@ export async function exportCSV(): Promise<number> {
       sp2.next_review_date  AS koen_next_review_date,
       sp2.interval_days     AS koen_interval_days,
       sp2.review_count      AS koen_review_count,
-      sp2.last_studied_at   AS koen_last_studied_at
+      sp2.last_studied_at   AS koen_last_studied_at,
+      sp3.next_review_date  AS jako_next_review_date,
+      sp3.interval_days     AS jako_interval_days,
+      sp3.review_count      AS jako_review_count,
+      sp3.last_studied_at   AS jako_last_studied_at,
+      sp4.next_review_date  AS koja_next_review_date,
+      sp4.interval_days     AS koja_interval_days,
+      sp4.review_count      AS koja_review_count,
+      sp4.last_studied_at   AS koja_last_studied_at,
+      sp5.next_review_date  AS zhko_next_review_date,
+      sp5.interval_days     AS zhko_interval_days,
+      sp5.review_count      AS zhko_review_count,
+      sp5.last_studied_at   AS zhko_last_studied_at,
+      sp6.next_review_date  AS kozh_next_review_date,
+      sp6.interval_days     AS kozh_interval_days,
+      sp6.review_count      AS kozh_review_count,
+      sp6.last_studied_at   AS kozh_last_studied_at
     FROM sentences s
     LEFT JOIN sentence_progress sp1 ON s.id = sp1.sentence_id AND sp1.direction = 'en-ko'
     LEFT JOIN sentence_progress sp2 ON s.id = sp2.sentence_id AND sp2.direction = 'ko-en'
+    LEFT JOIN sentence_progress sp3 ON s.id = sp3.sentence_id AND sp3.direction = 'ja-ko'
+    LEFT JOIN sentence_progress sp4 ON s.id = sp4.sentence_id AND sp4.direction = 'ko-ja'
+    LEFT JOIN sentence_progress sp5 ON s.id = sp5.sentence_id AND sp5.direction = 'zh-ko'
+    LEFT JOIN sentence_progress sp6 ON s.id = sp6.sentence_id AND sp6.direction = 'ko-zh'
     ORDER BY s.id
   `);
 

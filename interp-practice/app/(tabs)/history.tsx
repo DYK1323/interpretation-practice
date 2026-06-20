@@ -12,8 +12,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { getAllResults } from "../../src/db/results";
 import { getSentencesByIds } from "../../src/db/sentences";
 import { AudioPlayer } from "../../src/components/AudioPlayer";
-import { CATEGORY_LABELS } from "../../src/constants";
-import type { SessionResult, SentenceEntry } from "../../src/types/index";
+import { CATEGORY_LABELS, DIRECTION_LABELS } from "../../src/constants";
+import type { SessionResult, SentenceEntry, Direction } from "../../src/types/index";
 
 interface ResultWithSentence {
   result: SessionResult;
@@ -90,7 +90,7 @@ export default function HistoryScreen() {
             <View style={styles.cardHeader}>
               <View style={styles.badges}>
                 <Text style={styles.dirBadge}>
-                  {result.direction === "en-ko" ? "영→한" : "한→영"}
+                  {DIRECTION_LABELS[result.direction as Direction] ?? result.direction}
                 </Text>
                 {sentence && (
                   <Text style={styles.catBadge}>{CATEGORY_LABELS[sentence.category]}</Text>

@@ -13,10 +13,11 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import * as FileSystem from "expo-file-system";
 import { Ionicons } from "@expo/vector-icons";
 import { getSentenceById, upsertSentence, updateSentenceAudio } from "../../src/db/sentences";
+import { getAllSettings } from "../../src/db/settings";
 import { RecordButton } from "../../src/components/RecordButton";
 import { AudioPlayer } from "../../src/components/AudioPlayer";
 import { CATEGORIES } from "../../src/constants";
-import type { SentenceEntry, Category } from "../../src/types/index";
+import type { SentenceEntry, Category, ForeignLanguage } from "../../src/types/index";
 
 const DIFFICULTIES: { value: 1 | 2 | 3; label: string }[] = [
   { value: 1, label: "★☆☆" },
@@ -28,54 +29,128 @@ function makeNewId() {
   return `custom_${Date.now()}`;
 }
 
+type RecordingLang = "english" | "korean" | "japanese" | "chinese";
+
 export default function SentenceEdit() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const isNew = id === "new";
   const savingRef = useRef(false);
 
-  const [loading, setLoading] = useState(!isNew);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(isNew ? null : id);
-  const [recordingLang, setRecordingLang] = useState<"english" | "korean" | null>(null);
+  const [recordingLang, setRecordingLang] = useState<RecordingLang | null>(null);
 
+  const [foreignLanguage, setForeignLanguage] = useState<ForeignLanguage>("en");
   const [englishText, setEnglishText] = useState("");
   const [koreanText, setKoreanText] = useState("");
+  const [japaneseText, setJapaneseText] = useState("");
+  const [chineseText, setChineseText] = useState("");
   const [category, setCategory] = useState<Category>("daily");
   const [difficulty, setDifficulty] = useState<1 | 2 | 3>(2);
   const [tags, setTags] = useState("");
   const [modelKorean, setModelKorean] = useState("");
   const [modelEnglish, setModelEnglish] = useState("");
+  const [modelJapanese, setModelJapanese] = useState("");
+  const [modelChinese, setModelChinese] = useState("");
   const [notes, setNotes] = useState("");
   const [enAudio, setEnAudio] = useState<SentenceEntry["englishAudio"]>({ type: "tts" });
   const [koAudio, setKoAudio] = useState<SentenceEntry["koreanAudio"]>({ type: "tts" });
+  const [jaAudio, setJaAudio] = useState<SentenceEntry["japaneseAudio"]>({ type: "tts" });
+  const [zhAudio, setZhAudio] = useState<SentenceEntry["chineseAudio"]>({ type: "tts" });
 
   useEffect(() => {
     if (!isNew && id) loadSentence(id);
+    else loadSettingsForLanguage();
   }, [id]);
+
+  async function loadSettingsForLanguage() {
+    const s = await getAllSettings();
+    setForeignLanguage(s.foreignLanguage);
+    setLoading(false);
+  }
 
   async function loadSentence(sentenceId: string) {
     setLoading(true);
     const s = await getSentenceById(sentenceId);
     if (s) {
+      setForeignLanguage(s.foreignLanguage ?? "en");
       setEnglishText(s.englishText);
       setKoreanText(s.koreanText ?? "");
+      setJapaneseText(s.japaneseText ?? "");
+      setChineseText(s.chineseText ?? "");
       setCategory(s.category);
       setDifficulty(s.difficulty);
       setTags(s.tags.join(", "));
       setModelKorean(s.modelKorean ?? "");
       setModelEnglish(s.modelEnglish ?? "");
+      setModelJapanese(s.modelJapanese ?? "");
+      setModelChinese(s.modelChinese ?? "");
       setNotes(s.notes ?? "");
       setEnAudio(s.englishAudio ?? { type: "tts" });
       setKoAudio(s.koreanAudio ?? { type: "tts" });
+      setJaAudio(s.japaneseAudio ?? { type: "tts" });
+      setZhAudio(s.chineseAudio ?? { type: "tts" });
     }
     setLoading(false);
   }
 
+  function getPrimaryConfig() {
+    switch (foreignLanguage) {
+      case "ja": return {
+        lang: "japanese" as RecordingLang,
+        label: "일본어 원문",
+        placeholder: "일본어 문장을 입력하세요",
+        ttsLang: "ja-JP",
+        text: japaneseText,
+        setText: setJapaneseText,
+        audio: jaAudio,
+        koDesc: "한→일 연습 활성화",
+        modelKoDir: "일→한 연습 전용",
+        modelForeignLabel: "통역 예시 — 일본어",
+        modelForeignDir: "한→일 연습 전용",
+        modelForeignText: modelJapanese,
+        setModelForeignText: setModelJapanese,
+      };
+      case "zh": return {
+        lang: "chinese" as RecordingLang,
+        label: "중국어 원문",
+        placeholder: "중국어 문장을 입력하세요",
+        ttsLang: "zh-CN",
+        text: chineseText,
+        setText: setChineseText,
+        audio: zhAudio,
+        koDesc: "한→중 연습 활성화",
+        modelKoDir: "중→한 연습 전용",
+        modelForeignLabel: "통역 예시 — 중국어",
+        modelForeignDir: "한→중 연습 전용",
+        modelForeignText: modelChinese,
+        setModelForeignText: setModelChinese,
+      };
+      default: return {
+        lang: "english" as RecordingLang,
+        label: "영어 원문",
+        placeholder: "영어 문장을 입력하세요",
+        ttsLang: "en-US",
+        text: englishText,
+        setText: setEnglishText,
+        audio: enAudio,
+        koDesc: "한→영 연습 활성화",
+        modelKoDir: "영→한 연습 전용",
+        modelForeignLabel: "통역 예시 — 영어",
+        modelForeignDir: "한→영 연습 전용",
+        modelForeignText: modelEnglish,
+        setModelForeignText: setModelEnglish,
+      };
+    }
+  }
+
   async function handleSave() {
     if (savingRef.current) return;
-    if (!englishText.trim()) {
-      Alert.alert("오류", "영어 원문을 입력해주세요.");
+    const cfg = getPrimaryConfig();
+    if (!cfg.text.trim()) {
+      Alert.alert("오류", `${cfg.label}을 입력해주세요.`);
       return;
     }
     savingRef.current = true;
@@ -85,12 +160,19 @@ export default function SentenceEdit() {
       id: sentenceId,
       category,
       difficulty,
-      englishText: englishText.trim(),
+      foreignLanguage,
+      englishText: foreignLanguage === "en" ? englishText.trim() : "",
       koreanText: koreanText.trim() || undefined,
-      englishAudio: enAudio,
+      englishAudio: foreignLanguage === "en" ? enAudio : { type: "tts" },
       koreanAudio: koAudio,
+      japaneseText: foreignLanguage === "ja" ? (japaneseText.trim() || undefined) : undefined,
+      japaneseAudio: foreignLanguage === "ja" ? jaAudio : undefined,
+      chineseText: foreignLanguage === "zh" ? (chineseText.trim() || undefined) : undefined,
+      chineseAudio: foreignLanguage === "zh" ? zhAudio : undefined,
       modelKorean: modelKorean.trim() || undefined,
-      modelEnglish: modelEnglish.trim() || undefined,
+      modelEnglish: foreignLanguage === "en" ? (modelEnglish.trim() || undefined) : undefined,
+      modelJapanese: foreignLanguage === "ja" ? (modelJapanese.trim() || undefined) : undefined,
+      modelChinese: foreignLanguage === "zh" ? (modelChinese.trim() || undefined) : undefined,
       tags: tags.split(",").map(t => t.trim()).filter(Boolean),
       notes: notes.trim() || undefined,
     };
@@ -112,15 +194,24 @@ export default function SentenceEdit() {
 
   async function handleRecordingComplete(uri: string) {
     if (!recordingLang || !savedId) return;
-    const existingAudio = recordingLang === "english" ? enAudio : koAudio;
-    const lang = recordingLang;
+    const existingAudio =
+      recordingLang === "english" ? enAudio :
+      recordingLang === "korean" ? koAudio :
+      recordingLang === "japanese" ? jaAudio :
+      zhAudio;
+    const langLabel =
+      recordingLang === "english" ? "영어" :
+      recordingLang === "korean" ? "한국어" :
+      recordingLang === "japanese" ? "일본어" : "중국어";
 
     const doSave = async () => {
-      await updateSentenceAudio(savedId, lang, uri);
-      if (lang === "english") setEnAudio({ type: "file", uri });
-      else setKoAudio({ type: "file", uri });
+      await updateSentenceAudio(savedId, recordingLang, uri);
+      if (recordingLang === "english") setEnAudio({ type: "file", uri });
+      else if (recordingLang === "korean") setKoAudio({ type: "file", uri });
+      else if (recordingLang === "japanese") setJaAudio({ type: "file", uri });
+      else setZhAudio({ type: "file", uri });
       setRecordingLang(null);
-      Alert.alert("저장됨", `${lang === "english" ? "영어" : "한국어"} 음성이 저장됐습니다.`);
+      Alert.alert("저장됨", `${langLabel} 음성이 저장됐습니다.`);
     };
 
     if (existingAudio?.type === "file") {
@@ -128,20 +219,12 @@ export default function SentenceEdit() {
         "기존 음성 덮어쓰기",
         "기존 녹음을 새 녹음으로 교체할까요?",
         [
-          {
-            text: "취소",
-            style: "cancel",
-            onPress: () => setRecordingLang(null),
-          },
+          { text: "취소", style: "cancel", onPress: () => setRecordingLang(null) },
           {
             text: "교체",
             style: "destructive",
             onPress: async () => {
-              try {
-                await FileSystem.deleteAsync(existingAudio.uri, { idempotent: true });
-              } catch {
-                // old file may already be missing; proceed
-              }
+              try { await FileSystem.deleteAsync(existingAudio.uri, { idempotent: true }); } catch {}
               await doSave();
             },
           },
@@ -161,6 +244,7 @@ export default function SentenceEdit() {
   }
 
   const canRecord = !!savedId;
+  const cfg = getPrimaryConfig();
 
   return (
     <>
@@ -208,51 +292,53 @@ export default function SentenceEdit() {
           <Text style={styles.hint}>연습 후 자동으로 업데이트됩니다</Text>
         </View>
 
+        {/* Primary language (English / Japanese / Chinese based on foreignLanguage) */}
         <View style={styles.section}>
           <Text style={styles.label}>
-            영어 원문 <Text style={styles.required}>*</Text>
+            {cfg.label} <Text style={styles.required}>*</Text>
           </Text>
           <TextInput
             style={styles.textInput}
             multiline
-            placeholder="영어 문장을 입력하세요"
+            placeholder={cfg.placeholder}
             placeholderTextColor="#9CA3AF"
-            value={englishText}
-            onChangeText={setEnglishText}
+            value={cfg.text}
+            onChangeText={cfg.setText}
           />
-          {englishText.trim() ? (
+          {cfg.text.trim() ? (
             <View style={styles.audioRow}>
               <AudioPlayer
                 source={
-                  enAudio?.type === "file"
-                    ? { type: "file", uri: enAudio.uri }
-                    : { type: "tts", text: englishText, language: "en-US" }
+                  cfg.audio?.type === "file"
+                    ? { type: "file", uri: (cfg.audio as { type: "file"; uri: string }).uri }
+                    : { type: "tts", text: cfg.text, language: cfg.ttsLang }
                 }
               />
               {canRecord && (
                 <TouchableOpacity
                   style={styles.recordBtn}
-                  onPress={() => setRecordingLang(recordingLang === "english" ? null : "english")}
+                  onPress={() => setRecordingLang(recordingLang === cfg.lang ? null : cfg.lang)}
                 >
                   <Ionicons name="mic-outline" size={16} color="#374151" />
                   <Text style={styles.recordBtnText}>
-                    {enAudio?.type === "file" ? "재녹음" : "녹음"}
+                    {cfg.audio?.type === "file" ? "재녹음" : "녹음"}
                   </Text>
                 </TouchableOpacity>
               )}
             </View>
           ) : null}
-          {recordingLang === "english" && (
+          {recordingLang === cfg.lang && (
             <View style={styles.recorderBox}>
               <RecordButton onRecordingComplete={handleRecordingComplete} />
             </View>
           )}
         </View>
 
+        {/* Korean (always secondary) */}
         <View style={styles.section}>
           <Text style={styles.label}>
             한국어 원문{" "}
-            <Text style={styles.optional}>(선택 — 한→영 연습 활성화)</Text>
+            <Text style={styles.optional}>(선택 — {cfg.koDesc})</Text>
           </Text>
           <TextInput
             style={styles.textInput}
@@ -294,8 +380,12 @@ export default function SentenceEdit() {
           ) : null}
         </View>
 
+        {/* Model interp — Korean (외→한 direction) */}
         <View style={styles.section}>
-          <Text style={styles.label}>통역 예시 — 한국어 <Text style={styles.optional}>(영→한 연습 전용)</Text></Text>
+          <Text style={styles.label}>
+            통역 예시 — 한국어{" "}
+            <Text style={styles.optional}>({cfg.modelKoDir})</Text>
+          </Text>
           <TextInput
             style={styles.textInput}
             multiline
@@ -306,15 +396,19 @@ export default function SentenceEdit() {
           />
         </View>
 
+        {/* Model interp — Foreign language (한→외 direction) */}
         <View style={styles.section}>
-          <Text style={styles.label}>통역 예시 — 영어 <Text style={styles.optional}>(한→영 연습 전용)</Text></Text>
+          <Text style={styles.label}>
+            {cfg.modelForeignLabel}{" "}
+            <Text style={styles.optional}>({cfg.modelForeignDir})</Text>
+          </Text>
           <TextInput
             style={styles.textInput}
             multiline
-            placeholder="비워두면 영어 원문이 표시됨. 다르게 통역하고 싶을 때만 입력."
+            placeholder={`비워두면 ${cfg.label}이 표시됨. 다르게 통역하고 싶을 때만 입력.`}
             placeholderTextColor="#9CA3AF"
-            value={modelEnglish}
-            onChangeText={setModelEnglish}
+            value={cfg.modelForeignText}
+            onChangeText={cfg.setModelForeignText}
           />
         </View>
 

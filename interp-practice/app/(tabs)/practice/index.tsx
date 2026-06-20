@@ -14,8 +14,8 @@ import { getHeatmapData, getStats } from "../../../src/db/results";
 import { getAllSettings } from "../../../src/db/settings";
 import { useSessionStore } from "../../../src/features/session/useSessionStore";
 import { Heatmap } from "../../../src/components/Heatmap";
-import { CATEGORIES } from "../../../src/constants";
-import type { Direction, Category, UserSettings } from "../../../src/types/index";
+import { CATEGORIES, DIRECTION_LABELS, FOREIGN_LANGUAGE_DIRECTIONS } from "../../../src/constants";
+import type { Direction, Category, ForeignLanguage, UserSettings } from "../../../src/types/index";
 import { DEFAULT_SETTINGS } from "../../../src/types/index";
 import type { QueueItem } from "../../../src/features/session/useSessionStore";
 
@@ -32,6 +32,7 @@ export default function PracticeHome() {
   const router = useRouter();
   const { startQueue } = useSessionStore();
 
+  const [foreignLanguage, setForeignLanguage] = useState<ForeignLanguage>("en");
   const [direction, setDirection] = useState<Direction>("en-ko");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [dueCount, setDueCount] = useState(0);
@@ -55,11 +56,19 @@ export default function PracticeHome() {
     setLoading(true);
     const s = await getAllSettings();
     setPracticeSettings(s);
+    const fl = s.foreignLanguage;
+    setForeignLanguage(fl);
+    const dirs = FOREIGN_LANGUAGE_DIRECTIONS[fl];
+    let activeDir: Direction = direction;
+    if (!dirs.includes(activeDir)) {
+      activeDir = dirs[0];
+      setDirection(dirs[0]);
+    }
     const newStudiedToday = await countNewStudiedToday();
     const remainingNew = Math.max(0, s.dailyNewLimit - newStudiedToday);
     const [due, newSentences, heatmap, statsData] = await Promise.all([
-      getDueWithSentences(),
-      getNewSentences(direction, selectedCategory, remainingNew),
+      getDueWithSentences(Date.now(), fl),
+      getNewSentences(activeDir, selectedCategory, remainingNew),
       getHeatmapData(84),
       getStats(),
     ]);
@@ -141,14 +150,14 @@ export default function PracticeHome() {
         <View style={styles.filterSection}>
           <Text style={styles.filterLabel}>새 문장 방향</Text>
           <View style={styles.chipRow}>
-            {(["en-ko", "ko-en"] as Direction[]).map((d) => (
+            {FOREIGN_LANGUAGE_DIRECTIONS[foreignLanguage].map((d) => (
               <TouchableOpacity
                 key={d}
                 style={[styles.chip, direction === d && styles.chipActive]}
                 onPress={() => setDirection(d)}
               >
                 <Text style={[styles.chipText, direction === d && styles.chipTextActive]}>
-                  {d === "en-ko" ? "영→한" : "한→영"}
+                  {DIRECTION_LABELS[d]}
                 </Text>
               </TouchableOpacity>
             ))}

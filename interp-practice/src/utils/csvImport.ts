@@ -1,7 +1,7 @@
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { getDB } from "../db/schema";
-import type { SentenceEntry, Category } from "../types";
+import type { SentenceEntry, Category, ForeignLanguage } from "../types";
 
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
@@ -40,9 +40,13 @@ function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
   const get = (key: string) => cols[headers.indexOf(key)]?.trim() ?? "";
 
   const englishText = get("englishText");
-  if (!englishText) return null;
+  const japaneseText = get("japaneseText") || undefined;
+  const chineseText = get("chineseText") || undefined;
 
-  const id = get("id") || stableId(englishText);
+  if (!englishText && !japaneseText && !chineseText) return null;
+
+  const primaryText = englishText || japaneseText || chineseText || "";
+  const id = get("id") || stableId(primaryText);
 
   const tagsRaw = get("tags");
   const tags = tagsRaw
@@ -51,11 +55,20 @@ function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
       : tagsRaw.split(/\s+/).filter(Boolean)
     : [];
 
+  const foreignLangRaw = get("foreignLanguage");
+  const foreignLanguage: ForeignLanguage =
+    (["en", "ja", "zh"].includes(foreignLangRaw) ? foreignLangRaw as ForeignLanguage : null) ??
+    (japaneseText ? "ja" : chineseText ? "zh" : "en");
+
   const koreanText = get("koreanText") || undefined;
   const modelKorean = get("modelKorean") || undefined;
   const modelEnglish = get("modelEnglish") || undefined;
+  const modelJapanese = get("modelJapanese") || undefined;
+  const modelChinese = get("modelChinese") || undefined;
   const enAudioType = get("englishAudioType") || "tts";
   const koAudioType = get("koreanAudioType") || "tts";
+  const jaAudioType = get("japaneseAudioType") || "tts";
+  const zhAudioType = get("chineseAudioType") || "tts";
 
   const diffRaw = parseInt(get("difficulty"), 10);
   const difficulty = ([1, 2, 3].includes(diffRaw) ? diffRaw : 1) as 1 | 2 | 3;
@@ -64,6 +77,7 @@ function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
     id,
     category: (get("category") as Category) || "daily",
     difficulty,
+    foreignLanguage,
     englishText,
     koreanText,
     englishAudio: enAudioType === "file"
@@ -72,8 +86,18 @@ function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
     koreanAudio: koAudioType === "file"
       ? { type: "file", uri: get("koreanAudioUri") }
       : { type: "tts" },
+    japaneseText,
+    japaneseAudio: jaAudioType === "file"
+      ? { type: "file", uri: get("japaneseAudioUri") }
+      : { type: "tts" },
+    chineseText,
+    chineseAudio: zhAudioType === "file"
+      ? { type: "file", uri: get("chineseAudioUri") }
+      : { type: "tts" },
     modelKorean,
     modelEnglish,
+    modelJapanese,
+    modelChinese,
     tags,
     notes: get("notes") || undefined,
   };
@@ -84,14 +108,16 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
   if (lines.length < 2) return { imported: 0, failed: 0 };
 
   const headers = parseCSVLine(lines[0]);
-  if (!headers.includes("englishText")) {
+  if (!headers.includes("englishText") && !headers.includes("japaneseText") && !headers.includes("chineseText")) {
     throw new Error(
-      `필수 컬럼 'englishText'가 없습니다.\n\n첫 번째 행(헤더)을 확인하세요.\n필수: englishText\n권장: koreanText, category, difficulty`
+      `필수 컬럼이 없습니다.\n\n첫 번째 행(헤더)을 확인하세요.\n필수(하나 이상): englishText / japaneseText / chineseText\n권장: koreanText, category, difficulty`
     );
   }
   const keepDifficulty = !headers.includes("difficulty");
   const hasProgress =
-    headers.includes("enkoNextReviewDate") || headers.includes("koenNextReviewDate");
+    headers.includes("enkoNextReviewDate") || headers.includes("koenNextReviewDate") ||
+    headers.includes("jakoNextReviewDate") || headers.includes("kojaNextReviewDate") ||
+    headers.includes("zhkoNextReviewDate") || headers.includes("kozhNextReviewDate");
 
   const rows: { entry: SentenceEntry; cols: string[] }[] = [];
   let failed = 0;
@@ -111,32 +137,53 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
 
       await db.runAsync(
         `INSERT INTO sentences (
-          id, category, difficulty, english_text, korean_text,
+          id, category, difficulty, foreign_language,
+          english_text, korean_text,
           english_audio_type, english_audio_uri,
           korean_audio_type, korean_audio_uri,
-          model_korean, model_english, tags, duration_seconds, notes
-        ) VALUES (?, ?, COALESCE(?, 2), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          japanese_text, japanese_audio_type, japanese_audio_uri,
+          chinese_text, chinese_audio_type, chinese_audio_uri,
+          model_korean, model_english, model_japanese, model_chinese,
+          tags, duration_seconds, notes
+        ) VALUES (?, ?, COALESCE(?, 2), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           category = excluded.category,
           difficulty = COALESCE(excluded.difficulty, sentences.difficulty),
+          foreign_language = excluded.foreign_language,
           english_text = excluded.english_text,
           korean_text = excluded.korean_text,
           english_audio_type = excluded.english_audio_type,
           english_audio_uri = excluded.english_audio_uri,
           korean_audio_type = excluded.korean_audio_type,
           korean_audio_uri = excluded.korean_audio_uri,
+          japanese_text = excluded.japanese_text,
+          japanese_audio_type = excluded.japanese_audio_type,
+          japanese_audio_uri = excluded.japanese_audio_uri,
+          chinese_text = excluded.chinese_text,
+          chinese_audio_type = excluded.chinese_audio_type,
+          chinese_audio_uri = excluded.chinese_audio_uri,
           model_korean = excluded.model_korean,
           model_english = excluded.model_english,
+          model_japanese = excluded.model_japanese,
+          model_chinese = excluded.model_chinese,
           tags = excluded.tags,
           duration_seconds = excluded.duration_seconds,
           notes = excluded.notes`,
         [
-          e.id, e.category, diffParam, e.englishText, e.koreanText ?? null,
+          e.id, e.category, diffParam, e.foreignLanguage ?? "en",
+          e.englishText, e.koreanText ?? null,
           e.englishAudio?.type ?? "tts",
           e.englishAudio?.type === "file" ? e.englishAudio.uri : null,
           e.koreanAudio?.type ?? "tts",
           e.koreanAudio?.type === "file" ? e.koreanAudio.uri : null,
+          e.japaneseText ?? null,
+          e.japaneseAudio?.type ?? "tts",
+          e.japaneseAudio?.type === "file" ? e.japaneseAudio.uri : null,
+          e.chineseText ?? null,
+          e.chineseAudio?.type ?? "tts",
+          e.chineseAudio?.type === "file" ? e.chineseAudio.uri : null,
           e.modelKorean ?? null, e.modelEnglish ?? null,
+          e.modelJapanese ?? null, e.modelChinese ?? null,
           JSON.stringify(e.tags), e.durationSeconds ?? null, e.notes ?? null,
         ]
       );
@@ -153,6 +200,30 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
           intervalDays: get("koenIntervalDays"),
           reviewCount: get("koenReviewCount"),
           lastStudiedAt: get("koenLastStudiedAt"),
+        });
+        await upsertProgressFromRow(db, e.id, "ja-ko", {
+          nextReviewDate: get("jakoNextReviewDate"),
+          intervalDays: get("jakoIntervalDays"),
+          reviewCount: get("jakoReviewCount"),
+          lastStudiedAt: get("jakoLastStudiedAt"),
+        });
+        await upsertProgressFromRow(db, e.id, "ko-ja", {
+          nextReviewDate: get("kojaNextReviewDate"),
+          intervalDays: get("kojaIntervalDays"),
+          reviewCount: get("kojaReviewCount"),
+          lastStudiedAt: get("kojaLastStudiedAt"),
+        });
+        await upsertProgressFromRow(db, e.id, "zh-ko", {
+          nextReviewDate: get("zhkoNextReviewDate"),
+          intervalDays: get("zhkoIntervalDays"),
+          reviewCount: get("zhkoReviewCount"),
+          lastStudiedAt: get("zhkoLastStudiedAt"),
+        });
+        await upsertProgressFromRow(db, e.id, "ko-zh", {
+          nextReviewDate: get("kozhNextReviewDate"),
+          intervalDays: get("kozhIntervalDays"),
+          reviewCount: get("kozhReviewCount"),
+          lastStudiedAt: get("kozhLastStudiedAt"),
         });
       }
     }

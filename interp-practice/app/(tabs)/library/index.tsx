@@ -15,6 +15,7 @@ import {
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { getAllSentences, deleteSentence } from "../../../src/db/sentences";
+import { getAllSettings } from "../../../src/db/settings";
 import { CATEGORIES, CATEGORY_LABELS } from "../../../src/constants";
 import type { SentenceEntry, Category } from "../../../src/types/index";
 
@@ -47,7 +48,8 @@ export default function LibraryIndex() {
 
   async function load() {
     setLoading(true);
-    const data = await getAllSentences();
+    const s = await getAllSettings();
+    const data = await getAllSentences(s.foreignLanguage);
     setSentences(data);
     setLoading(false);
   }
@@ -68,6 +70,8 @@ export default function LibraryIndex() {
         const hit =
           s.englishText.toLowerCase().includes(q) ||
           (s.koreanText?.toLowerCase().includes(q) ?? false) ||
+          (s.japaneseText?.toLowerCase().includes(q) ?? false) ||
+          (s.chineseText?.toLowerCase().includes(q) ?? false) ||
           (s.notes?.toLowerCase().includes(q) ?? false);
         if (!hit) return false;
       }
@@ -138,7 +142,7 @@ export default function LibraryIndex() {
       <View style={styles.searchBox}>
         <TextInput
           style={styles.searchInput}
-          placeholder="한국어 / 영어 통합 검색"
+          placeholder="통합 검색"
           placeholderTextColor="#9CA3AF"
           value={query}
           onChangeText={setQuery}
@@ -191,6 +195,10 @@ export default function LibraryIndex() {
           renderItem={({ item }) => {
             const displayTags = item.tags.slice(0, 3);
             const extraCount = item.tags.length - 3;
+            const primaryText =
+              item.foreignLanguage === "ja" ? (item.japaneseText ?? item.englishText) :
+              item.foreignLanguage === "zh" ? (item.chineseText ?? item.englishText) :
+              item.englishText;
             return (
               <TouchableOpacity
                 style={styles.card}
@@ -212,7 +220,9 @@ export default function LibraryIndex() {
                     {"★".repeat(item.difficulty) + "☆".repeat(3 - item.difficulty)}
                   </Text>
                 </View>
-                <Text style={styles.enText} numberOfLines={2}>{item.englishText}</Text>
+                {primaryText ? (
+                  <Text style={styles.enText} numberOfLines={2}>{primaryText}</Text>
+                ) : null}
                 {item.koreanText && (
                   <Text style={styles.koText} numberOfLines={1}>{item.koreanText}</Text>
                 )}
