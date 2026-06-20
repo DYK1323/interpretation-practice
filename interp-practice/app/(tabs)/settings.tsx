@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -14,13 +14,19 @@ import {
   Platform,
   ToastAndroid,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { getAllSettings, setSetting, getStringSetting, setStringSetting } from "../../src/db/settings";
 import { syncFromSheetUrl } from "../../src/utils/csvImport";
 import { exportCSV } from "../../src/utils/csvExport";
+import { syncFromScript, exportToScript } from "../../src/utils/scriptSync";
+import { formatSyncTime } from "../../src/utils/formatTime";
 import type { UserSettings, ForeignLanguage } from "../../src/types";
 import { DEFAULT_SETTINGS } from "../../src/types";
 import { FOREIGN_LANGUAGE_LABELS } from "../../src/constants";
+
+const SCRIPT_URL_KEY = "scriptSyncUrl";
+const LAST_IMPORT_KEY = "scriptLastImportAt";
+const LAST_EXPORT_KEY = "scriptLastExportAt";
 
 const SPEEDS = [
   { value: 0.5, label: "0.5x (매우 느리게)" },
@@ -43,10 +49,20 @@ export default function SettingsScreen() {
   const [limitInput, setLimitInput] = useState("");
   const limitInputRef = useRef<TextInput>(null);
   const [customSpeedText, setCustomSpeedText] = useState("");
+  const [scriptSyncUrl, setScriptSyncUrl] = useState<string | null>(null);
+  const [scriptImporting, setScriptImporting] = useState(false);
+  const [scriptExporting, setScriptExporting] = useState(false);
+  const [lastImportAt, setLastImportAt] = useState<number | null>(null);
+  const [lastExportAt, setLastExportAt] = useState<number | null>(null);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadSettings();
+      getStringSetting(SCRIPT_URL_KEY).then((v) => setScriptSyncUrl(v ?? null));
+      getStringSetting(LAST_IMPORT_KEY).then((v) => { if (v) setLastImportAt(Number(v)); });
+      getStringSetting(LAST_EXPORT_KEY).then((v) => { if (v) setLastExportAt(Number(v)); });
+    }, [])
+  );
 
   async function loadSettings() {
     const s = await getAllSettings();
@@ -84,6 +100,39 @@ export default function SettingsScreen() {
     updateSetting("dailyNewLimit", n);
     setLimitModalVisible(false);
     setLimitInput("");
+  }
+
+  async function handleScriptImport() {
+    if (!scriptSyncUrl) return;
+    setScriptImporting(true);
+    try {
+      const { imported, failed } = await syncFromScript(scriptSyncUrl);
+      const now = Date.now();
+      await setStringSetting(LAST_IMPORT_KEY, String(now));
+      setLastImportAt(now);
+      Alert.alert("가져오기 완료", `${imported}개 문장 가져옴${failed > 0 ? `, ${failed}개 실패` : ""}`);
+    } catch (e: any) {
+      Alert.alert("가져오기 실패", e?.message ?? "알 수 없는 오류");
+    } finally {
+      setScriptImporting(false);
+    }
+  }
+
+  async function handleScriptExport() {
+    if (!scriptSyncUrl) return;
+    setScriptExporting(true);
+    try {
+      const count = await exportToScript(scriptSyncUrl);
+      const now = Date.now();
+      await setStringSetting(LAST_EXPORT_KEY, String(now));
+      setLastExportAt(now);
+      if (Platform.OS === "android") ToastAndroid.show(`${count}개 문장 내보내기 완료`, ToastAndroid.SHORT);
+      else Alert.alert("내보내기 완료", `${count}개 문장을 시트에 내보냈습니다.`);
+    } catch (e: any) {
+      Alert.alert("내보내기 실패", e?.message ?? "알 수 없는 오류");
+    } finally {
+      setScriptExporting(false);
+    }
   }
 
   function handleSyncPress() {
@@ -161,12 +210,53 @@ export default function SettingsScreen() {
             : <Text style={styles.actionBtnText}>시트에서 문장 가져오기</Text>
           }
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.advancedSyncBtn}
-          onPress={() => router.push("/sync-setup")}
-        >
-          <Text style={styles.advancedSyncBtnText}>실시간 동기화가 필요해요 →</Text>
-        </TouchableOpacity>
+      </View>
+
+      {/* 양방향 동기화 */}
+      <View style={styles.group}>
+        <Text style={styles.groupTitle}>양방향 동기화</Text>
+        {!scriptSyncUrl ? (
+          <>
+            <Text style={styles.desc}>
+              Google Apps Script를 통해 앱과 스프레드시트를 양방향으로 동기화합니다.
+            </Text>
+            <TouchableOpacity style={styles.advancedSyncBtn} onPress={() => router.push("/sync-setup")}>
+              <Text style={styles.advancedSyncBtnText}>설정하기 →</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[styles.actionBtn, scriptImporting && styles.actionBtnDisabled]}
+              onPress={handleScriptImport}
+              disabled={scriptImporting}
+            >
+              {scriptImporting
+                ? <ActivityIndicator size="small" color="#FFFFFF" />
+                : <Text style={styles.actionBtnText}>시트 → 앱으로 가져오기</Text>
+              }
+            </TouchableOpacity>
+            {lastImportAt != null && (
+              <Text style={styles.hint}>마지막 가져오기: {formatSyncTime(lastImportAt)}</Text>
+            )}
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnSecondary, scriptExporting && styles.actionBtnDisabled]}
+              onPress={handleScriptExport}
+              disabled={scriptExporting}
+            >
+              {scriptExporting
+                ? <ActivityIndicator size="small" color="#1A56DB" />
+                : <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>앱 → 시트로 내보내기</Text>
+              }
+            </TouchableOpacity>
+            {lastExportAt != null && (
+              <Text style={styles.hint}>마지막 내보내기: {formatSyncTime(lastExportAt)}</Text>
+            )}
+            <TouchableOpacity style={styles.advancedSyncBtn} onPress={() => router.push("/sync-setup")}>
+              <Text style={styles.advancedSyncBtnText}>설정 변경 →</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* CSV 내보내기 */}

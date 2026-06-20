@@ -15,33 +15,11 @@ import {
 import { Stack, useRouter } from "expo-router";
 import { getStringSetting, setStringSetting } from "../src/db/settings";
 import { syncFromScript, exportToScript } from "../src/utils/scriptSync";
+import { formatSyncTime } from "../src/utils/formatTime";
 
 const SCRIPT_URL_KEY = "scriptSyncUrl";
 const LAST_IMPORT_KEY = "scriptLastImportAt";
 const LAST_EXPORT_KEY = "scriptLastExportAt";
-
-function formatSyncTime(ts: number): string {
-  const d = new Date(ts);
-  const now = new Date();
-  const diffMs = Date.now() - ts;
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHour = Math.floor(diffMs / 3600000);
-  const diffDay = Math.floor(diffMs / 86400000);
-
-  if (diffMin < 1) return "방금 전";
-  if (diffMin < 60) return `${diffMin}분 전`;
-  if (diffHour < 24) return `${diffHour}시간 전`;
-  if (diffDay < 7) return `${diffDay}일 전`;
-
-  const isSameYear = d.getFullYear() === now.getFullYear();
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const hour = d.getHours().toString().padStart(2, "0");
-  const min = d.getMinutes().toString().padStart(2, "0");
-  return isSameYear
-    ? `${month}/${day} ${hour}:${min}`
-    : `${d.getFullYear()}/${month}/${day}`;
-}
 
 const SCRIPT_CODE = `function doGet() {
   const sheet = SpreadsheetApp
@@ -143,7 +121,7 @@ export default function SyncSetupScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: "실시간 동기화 설정",
+          title: "양방향 동기화 설정",
           headerBackTitle: "설정",
         }}
       />
@@ -152,7 +130,7 @@ export default function SyncSetupScreen() {
         <View style={styles.infoBox}>
           <Text style={styles.infoText}>
             Google Apps Script를 통해 앱과 스프레드시트를 양방향으로 동기화합니다.
-            최초 설정 후에는 버튼 하나로 가져오기·내보내기가 가능합니다.
+            최초 설정 후에는 버튼 하나로 가져오기·내보내기를 수동으로 실행할 수 있습니다.
           </Text>
         </View>
 
