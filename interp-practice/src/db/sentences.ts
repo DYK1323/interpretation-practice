@@ -28,7 +28,7 @@ function rowToEntry(row: any): SentenceEntry {
 
 export async function getAllSentences(): Promise<SentenceEntry[]> {
   const db = await getDB();
-  const rows = await db.getAllAsync<any>("SELECT * FROM sentences ORDER BY category, difficulty, id");
+  const rows = await db.getAllAsync<any>("SELECT * FROM sentences WHERE is_draft = 0 ORDER BY category, difficulty, id");
   return rows.map(rowToEntry);
 }
 
@@ -38,7 +38,7 @@ export async function getSentencesByCategory(
   direction?: Direction
 ): Promise<SentenceEntry[]> {
   const db = await getDB();
-  let query = "SELECT * FROM sentences WHERE category = ?";
+  let query = "SELECT * FROM sentences WHERE category = ? AND is_draft = 0";
   const params: any[] = [category];
 
   if (difficulty) {
@@ -58,6 +58,17 @@ export async function getSentenceById(id: string): Promise<SentenceEntry | null>
   const db = await getDB();
   const row = await db.getFirstAsync<any>("SELECT * FROM sentences WHERE id = ?", [id]);
   return row ? rowToEntry(row) : null;
+}
+
+export async function getSentencesByIds(ids: string[]): Promise<Record<string, SentenceEntry>> {
+  if (ids.length === 0) return {};
+  const db = await getDB();
+  const placeholders = ids.map(() => "?").join(",");
+  const rows = await db.getAllAsync<any>(
+    `SELECT * FROM sentences WHERE id IN (${placeholders}) AND is_draft = 0`,
+    ids
+  );
+  return Object.fromEntries(rows.map(r => [r.id, rowToEntry(r)]));
 }
 
 export async function upsertSentence(

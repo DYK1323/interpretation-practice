@@ -62,6 +62,11 @@ async function _runInit(): Promise<void> {
     await database.execAsync(`ALTER TABLE sentences ADD COLUMN is_draft INTEGER NOT NULL DEFAULT 0`);
   }
 
+  const progressCols = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(sentence_progress)`);
+  if (!progressCols.some(c => c.name === "first_studied_at")) {
+    await database.execAsync(`ALTER TABLE sentence_progress ADD COLUMN first_studied_at INTEGER`);
+  }
+
   const resultCols = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(session_results)`);
   if (!resultCols.some(c => c.name === "back_interp_recording_uri")) {
     await database.execAsync(`ALTER TABLE session_results ADD COLUMN back_interp_recording_uri TEXT`);

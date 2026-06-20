@@ -61,7 +61,7 @@ export default function PracticeHome() {
     setLoading(true);
     const s = await getAllSettings();
     setPracticeSettings(s);
-    const newStudiedToday = await countNewStudiedToday(direction);
+    const newStudiedToday = await countNewStudiedToday();
     const remainingNew = Math.max(0, s.dailyNewLimit - newStudiedToday);
     const [due, newSentences, heatmap, statsData] = await Promise.all([
       getDueWithSentences(),

@@ -88,21 +88,19 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
   const hasProgress =
     headers.includes("enkoNextReviewDate") || headers.includes("koenNextReviewDate");
 
-  const entries: SentenceEntry[] = [];
+  const rows: { entry: SentenceEntry; cols: string[] }[] = [];
   let failed = 0;
 
   for (let i = 1; i < lines.length; i++) {
     const cols = parseCSVLine(lines[i]);
     const entry = rowToEntry(cols, headers);
-    if (entry) entries.push(entry);
+    if (entry) rows.push({ entry, cols });
     else failed++;
   }
 
   const db = await getDB();
   await db.withTransactionAsync(async () => {
-    for (let i = 0; i < entries.length; i++) {
-      const e = entries[i];
-      const cols = parseCSVLine(lines[i + 1]);
+    for (const { entry: e, cols } of rows) {
       const get = (key: string) => cols[headers.indexOf(key)]?.trim() ?? "";
       const diffParam = keepDifficulty ? null : e.difficulty;
 
@@ -155,7 +153,7 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
     }
   });
 
-  return { imported: entries.length, failed };
+  return { imported: rows.length, failed };
 }
 
 async function upsertProgressFromRow(
@@ -171,14 +169,14 @@ async function upsertProgressFromRow(
   const lastStudiedAt = parseInt(fields.lastStudiedAt, 10) || null;
 
   await db.runAsync(
-    `INSERT INTO sentence_progress (sentence_id, direction, next_review_date, interval_days, review_count, last_studied_at)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO sentence_progress (sentence_id, direction, next_review_date, interval_days, review_count, last_studied_at, first_studied_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(sentence_id, direction) DO UPDATE SET
        next_review_date = excluded.next_review_date,
        interval_days = excluded.interval_days,
        review_count = excluded.review_count,
        last_studied_at = excluded.last_studied_at`,
-    [sentenceId, direction, nextReviewDate, intervalDays, reviewCount, lastStudiedAt]
+    [sentenceId, direction, nextReviewDate, intervalDays, reviewCount, lastStudiedAt, lastStudiedAt]
   );
 }
 

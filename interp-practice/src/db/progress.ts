@@ -29,7 +29,7 @@ export async function getDueWithSentences(
     `SELECT s.*, sp.direction as sp_direction
      FROM sentence_progress sp
      JOIN sentences s ON s.id = sp.sentence_id
-     WHERE sp.next_review_date <= ?
+     WHERE sp.next_review_date <= ? AND s.is_draft = 0
      ORDER BY sp.next_review_date ASC`,
     [now]
   );
@@ -76,7 +76,7 @@ export async function getNewSentences(
   const rows = await db.getAllAsync<any>(
     `SELECT s.* FROM sentences s
      LEFT JOIN sentence_progress sp ON s.id = sp.sentence_id AND sp.direction = ?
-     WHERE sp.sentence_id IS NULL${filter}
+     WHERE sp.sentence_id IS NULL AND s.is_draft = 0${filter}
      ORDER BY s.difficulty ASC, s.id ASC
      LIMIT ?`,
     params
@@ -113,14 +113,14 @@ export async function getProgress(
   return row ? rowToProgress(row) : null;
 }
 
-export async function countNewStudiedToday(direction: Direction): Promise<number> {
+export async function countNewStudiedToday(): Promise<number> {
   const db = await getDB();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const row = await db.getFirstAsync<{ cnt: number }>(
-    `SELECT COUNT(*) as cnt FROM sentence_progress
-     WHERE direction = ? AND review_count = 1 AND last_studied_at >= ?`,
-    [direction, todayStart.getTime()]
+    `SELECT COUNT(DISTINCT sentence_id) as cnt FROM sentence_progress
+     WHERE first_studied_at >= ?`,
+    [todayStart.getTime()]
   );
   return row?.cnt ?? 0;
 }
@@ -135,13 +135,13 @@ export async function scheduleReview(
   const nextReviewDate = now + intervalDays * 24 * 60 * 60 * 1000;
 
   await db.runAsync(
-    `INSERT INTO sentence_progress (sentence_id, direction, next_review_date, interval_days, review_count, last_studied_at)
-     VALUES (?, ?, ?, ?, 1, ?)
+    `INSERT INTO sentence_progress (sentence_id, direction, next_review_date, interval_days, review_count, last_studied_at, first_studied_at)
+     VALUES (?, ?, ?, ?, 1, ?, ?)
      ON CONFLICT(sentence_id, direction) DO UPDATE SET
        next_review_date = excluded.next_review_date,
        interval_days = excluded.interval_days,
        review_count = review_count + 1,
        last_studied_at = excluded.last_studied_at`,
-    [sentenceId, direction, nextReviewDate, intervalDays, now]
+    [sentenceId, direction, nextReviewDate, intervalDays, now, now]
   );
 }
