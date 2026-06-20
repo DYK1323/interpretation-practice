@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { getDueWithSentences, getNewSentences } from "../../../src/db/progress";
+import { getDueWithSentences, getNewSentences, countNewStudiedToday } from "../../../src/db/progress";
 import { getHeatmapData, getStats } from "../../../src/db/results";
 import { getAllSettings } from "../../../src/db/settings";
 import { useSessionStore } from "../../../src/features/session/useSessionStore";
@@ -61,9 +61,11 @@ export default function PracticeHome() {
     setLoading(true);
     const s = await getAllSettings();
     setPracticeSettings(s);
+    const newStudiedToday = await countNewStudiedToday(direction);
+    const remainingNew = Math.max(0, s.dailyNewLimit - newStudiedToday);
     const [due, newSentences, heatmap, statsData] = await Promise.all([
       getDueWithSentences(),
-      getNewSentences(direction, selectedCategory, s.dailyNewLimit),
+      getNewSentences(direction, selectedCategory, remainingNew),
       getHeatmapData(84),
       getStats(),
     ]);

@@ -113,6 +113,18 @@ export async function getProgress(
   return row ? rowToProgress(row) : null;
 }
 
+export async function countNewStudiedToday(direction: Direction): Promise<number> {
+  const db = await getDB();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const row = await db.getFirstAsync<{ cnt: number }>(
+    `SELECT COUNT(*) as cnt FROM sentence_progress
+     WHERE direction = ? AND review_count = 1 AND last_studied_at >= ?`,
+    [direction, todayStart.getTime()]
+  );
+  return row?.cnt ?? 0;
+}
+
 export async function scheduleReview(
   sentenceId: string,
   direction: Direction,
