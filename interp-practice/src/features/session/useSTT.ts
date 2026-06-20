@@ -59,11 +59,14 @@ export function useSTT(direction: Direction, onEnd?: (text: string) => void) {
 
   useSpeechRecognitionEvent("result", (event) => {
     const text = event.results[0]?.transcript ?? "";
-    lastInterimRef.current = text;
     if (event.isFinal) {
-      currentFinalRef.current = text;
+      // Accumulate (not overwrite) — continuous mode fires isFinal per utterance
+      currentFinalRef.current = [currentFinalRef.current, text].filter(Boolean).join(" ");
+      lastInterimRef.current = "";
+    } else {
+      lastInterimRef.current = text;
     }
-    setTranscript([accumulatedRef.current, text].filter(Boolean).join(" "));
+    setTranscript([accumulatedRef.current, currentFinalRef.current, lastInterimRef.current].filter(Boolean).join(" "));
   });
 
   useSpeechRecognitionEvent("error", (event) => {
