@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "통역 연습",
+    "slug": "interp-practice",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "interp-practice",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.interpractice.app",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "통역 내용을 텍스트로 변환하기 위해 음성 인식 접근이 필요합니다.",
+        "NSMicrophoneUsageDescription": "통역 연습 녹음을 위해 마이크 접근이 필요합니다."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1A56DB",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png"
+      },
+      "package": "com.interpractice.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/225c04e8-5135-417f-b2bd-698eeb7066a1"
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-updates",
+      "expo-audio",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "통역 연습 녹음을 위해 마이크 접근이 필요합니다.",
+          "speechRecognitionPermission": "통역 내용을 텍스트로 변환하기 위해 음성 인식 접근이 필요합니다.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ],
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "225c04e8-5135-417f-b2bd-698eeb7066a1"
+      }
+    }
+  }
+}

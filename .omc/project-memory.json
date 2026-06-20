@@ -1,0 +1,144 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1781958927098,
+  "projectRoot": "c:\\Users\\DAYOUNG\\260522",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "desktop-app": {
+      "path": "desktop-app",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1781958927023,
+      "keyFiles": [
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "README.md",
+        "tsconfig.json"
+      ]
+    },
+    "interp-practice": {
+      "path": "interp-practice",
+      "purpose": null,
+      "fileCount": 12,
+      "lastAccessed": 1781958927024,
+      "keyFiles": [
+        "AGENTS.md",
+        "app.json",
+        "App.tsx",
+        "CLAUDE.md",
+        "eas.json"
+      ]
+    },
+    "desktop-app\\dist": {
+      "path": "desktop-app\\dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 1,
+      "lastAccessed": 1781958927025,
+      "keyFiles": [
+        "index.html"
+      ]
+    },
+    "desktop-app\\node_modules": {
+      "path": "desktop-app\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1781958927025,
+      "keyFiles": []
+    },
+    "desktop-app\\src": {
+      "path": "desktop-app\\src",
+      "purpose": "Source code",
+      "fileCount": 4,
+      "lastAccessed": 1781958927026,
+      "keyFiles": [
+        "App.tsx",
+        "main.tsx",
+        "styles.css"
+      ]
+    },
+    "interp-practice\\app": {
+      "path": "interp-practice\\app",
+      "purpose": "Application code",
+      "fileCount": 3,
+      "lastAccessed": 1781958927027,
+      "keyFiles": [
+        "index.tsx",
+        "sync-setup.tsx",
+        "_layout.tsx"
+      ]
+    },
+    "interp-practice\\assets": {
+      "path": "interp-practice\\assets",
+      "purpose": "Static assets",
+      "fileCount": 6,
+      "lastAccessed": 1781958927027,
+      "keyFiles": [
+        "android-icon-background.png",
+        "android-icon-foreground.png",
+        "android-icon-monochrome.png"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "desktop-app\\package.json",
+      "accessCount": 2,
+      "lastAccessed": 1781960140243,
+      "type": "file"
+    },
+    {
+      "path": "desktop-app\\src\\tauri\\api.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781959008751,
+      "type": "file"
+    },
+    {
+      "path": "desktop-app\\src\\core\\types.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781959008895,
+      "type": "file"
+    },
+    {
+      "path": "desktop-app\\src\\core\\csv.ts",
+      "accessCount": 1,
+      "lastAccessed": 1781959039338,
+      "type": "file"
+    },
+    {
+      "path": "desktop-app\\src\\App.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1781959040271,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

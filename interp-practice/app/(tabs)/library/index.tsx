@@ -1,0 +1,536 @@
+import React, { useState, useCallback, useMemo } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  TextInput,
+  ScrollView,
+  Modal,
+  Pressable,
+} from "react-native";
+import { useRouter, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { getAllSentences } from "../../../src/db/sentences";
+import { getAllSettings } from "../../../src/db/settings";
+import { getProgressSummaryByIds } from "../../../src/db/progress";
+import { CATEGORIES, CATEGORY_LABELS } from "../../../src/constants";
+import type { SentenceEntry, Category } from "../../../src/types/index";
+
+const DIFFICULTIES = [
+  { value: 1 as const, label: "★☆☆" },
+  { value: 2 as const, label: "★★☆" },
+  { value: 3 as const, label: "★★★" },
+];
+
+function daysAgo(ts: number): string {
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  if (days <= 0) return "오늘";
+  if (days === 1) return "어제";
+  return `${days}일 전`;
+}
+
+function daysUntil(ts: number): string {
+  const days = Math.floor((ts - Date.now()) / 86400000);
+  if (days <= 0) return "오늘";
+  if (days === 1) return "내일";
+  return `${days}일 후`;
+}
+
+export default function LibraryIndex() {
+  const router = useRouter();
+  const [sentences, setSentences] = useState<SentenceEntry[]>([]);
+  const [progressMap, setProgressMap] = useState<Record<string, { lastStudiedAt: number | null; nextReviewDate: number | null }>>({});
+  const [loading, setLoading] = useState(true);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+
+  const [query, setQuery] = useState("");
+  const [filterDiff, setFilterDiff] = useState<1 | 2 | 3 | null>(null);
+  const [filterCat, setFilterCat] = useState<Category | null>(null);
+  const [filterTag, setFilterTag] = useState<string | null>(null);
+
+  const [draftDiff, setDraftDiff] = useState<1 | 2 | 3 | null>(null);
+  const [draftCat, setDraftCat] = useState<Category | null>(null);
+  const [draftTag, setDraftTag] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [])
+  );
+
+  async function load() {
+    setLoading(true);
+    const s = await getAllSettings();
+    const data = await getAllSentences(s.foreignLanguage);
+    setSentences(data);
+    const prog = await getProgressSummaryByIds(data.map((x) => x.id));
+    setProgressMap(prog);
+    setLoading(false);
+  }
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    sentences.forEach((s) => s.tags.forEach((t) => set.add(t)));
+    return Array.from(set).sort();
+  }, [sentences]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return sentences.filter((s) => {
+      if (filterDiff && s.difficulty !== filterDiff) return false;
+      if (filterCat && s.category !== filterCat) return false;
+      if (filterTag && !s.tags.includes(filterTag)) return false;
+      if (q) {
+        const hit =
+          s.englishText.toLowerCase().includes(q) ||
+          (s.koreanText?.toLowerCase().includes(q) ?? false) ||
+          (s.japaneseText?.toLowerCase().includes(q) ?? false) ||
+          (s.chineseText?.toLowerCase().includes(q) ?? false) ||
+          (s.notes?.toLowerCase().includes(q) ?? false);
+        if (!hit) return false;
+      }
+      return true;
+    });
+  }, [sentences, query, filterDiff, filterCat, filterTag]);
+
+  const activeFilterCount = (filterDiff ? 1 : 0) + (filterCat ? 1 : 0) + (filterTag ? 1 : 0);
+  const isFiltered = !!query || activeFilterCount > 0;
+
+  function openFilterModal() {
+    setDraftDiff(filterDiff);
+    setDraftCat(filterCat);
+    setDraftTag(filterTag);
+    setFilterModalVisible(true);
+  }
+
+  function applyFilter() {
+    setFilterDiff(draftDiff);
+    setFilterCat(draftCat);
+    setFilterTag(draftTag);
+    setFilterModalVisible(false);
+  }
+
+  function resetFilter() {
+    setDraftDiff(null);
+    setDraftCat(null);
+    setDraftTag(null);
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* 툴바 */}
+      <View style={styles.toolbar}>
+        <Text style={styles.count}>
+          {isFiltered ? `${filtered.length} / ${sentences.length}개` : `${sentences.length}개 문장`}
+        </Text>
+        <View style={styles.toolbarRight}>
+          <TouchableOpacity style={styles.filterBtn} onPress={openFilterModal}>
+            <Text style={styles.filterBtnText}>필터</Text>
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addBtn} onPress={() => router.push("/library-edit/new")}>
+            <Text style={styles.addBtnText}>+ 추가</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* 검색 */}
+      <View style={styles.searchBox}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="통합 검색"
+          placeholderTextColor="#9CA3AF"
+          value={query}
+          onChangeText={setQuery}
+          returnKeyType="search"
+        />
+        {query.length > 0 && (
+          <TouchableOpacity onPress={() => setQuery("")} style={styles.clearBtn}>
+            <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* 활성 필터 요약 */}
+      {activeFilterCount > 0 && (
+        <View style={styles.activeSummary}>
+          {filterDiff && <Text style={styles.activeChip}>{"★".repeat(filterDiff) + "☆".repeat(3 - filterDiff)}</Text>}
+          {filterCat && <Text style={styles.activeChip}>{CATEGORIES.find(c => c.key === filterCat)?.label}</Text>}
+          {filterTag && <Text style={styles.activeChip}>{filterTag}</Text>}
+          <TouchableOpacity onPress={() => { setFilterDiff(null); setFilterCat(null); setFilterTag(null); }}>
+            <Text style={styles.clearAllText}>전체 해제</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#1A56DB" />
+        </View>
+      ) : sentences.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>📂</Text>
+          <Text style={styles.emptyTitle}>문장이 없습니다</Text>
+          <Text style={styles.emptyDesc}>설정에서 구글 시트를 동기화하거나{"\n"}직접 추가해보세요.</Text>
+        </View>
+      ) : filtered.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>🔍</Text>
+          <Text style={styles.emptyTitle}>검색 결과 없음</Text>
+          <Text style={styles.emptyDesc}>다른 검색어나 필터를 시도해보세요.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item }) => {
+            const displayTags = item.tags.slice(0, 3);
+            const extraCount = item.tags.length - 3;
+            const primaryText =
+              item.foreignLanguage === "ja" ? (item.japaneseText ?? item.englishText) :
+              item.foreignLanguage === "zh" ? (item.chineseText ?? item.englishText) :
+              item.englishText;
+            const prog = progressMap[item.id];
+            return (
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() => router.push(`/library-edit/${item.id}`)}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={styles.badges}>
+                    <Text style={styles.catBadge}>{CATEGORY_LABELS[item.category]}</Text>
+                    {item.koreanText && <Text style={styles.dirBadge}>양방향</Text>}
+                    {displayTags.map((t) => (
+                      <Text key={t} style={styles.tagBadge}>{t}</Text>
+                    ))}
+                    {extraCount > 0 && (
+                      <Text style={styles.extraBadge}>+{extraCount}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.diffText}>
+                    {"★".repeat(item.difficulty) + "☆".repeat(3 - item.difficulty)}
+                  </Text>
+                </View>
+                {primaryText ? (
+                  <Text style={styles.enText} numberOfLines={2}>{primaryText}</Text>
+                ) : null}
+                {item.koreanText && (
+                  <Text style={styles.koText} numberOfLines={1}>{item.koreanText}</Text>
+                )}
+                {item.notes && (
+                  <Text style={styles.notesPreview} numberOfLines={1}>📝 {item.notes}</Text>
+                )}
+                {prog && (
+                  <View style={styles.progressRow}>
+                    {prog.lastStudiedAt ? (
+                      <Text style={styles.progressText}>마지막 {daysAgo(prog.lastStudiedAt)}</Text>
+                    ) : null}
+                    {prog.nextReviewDate ? (
+                      <Text style={[
+                        styles.progressText,
+                        prog.nextReviewDate <= Date.now() && styles.overdueDot,
+                      ]}>
+                        {prog.lastStudiedAt ? " · " : ""}다음 {daysUntil(prog.nextReviewDate)}
+                      </Text>
+                    ) : null}
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          }}
+        />
+      )}
+
+      {/* 필터 모달 */}
+      <Modal
+        visible={filterModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setFilterModalVisible(false)} />
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>필터</Text>
+            <TouchableOpacity onPress={resetFilter}>
+              <Text style={styles.resetText}>초기화</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.sheetBody} showsVerticalScrollIndicator={false}>
+            {/* 난이도 */}
+            <Text style={styles.sectionLabel}>난이도</Text>
+            <View style={styles.chipWrap}>
+              <TouchableOpacity
+                style={[styles.chip, draftDiff === null && styles.chipActive]}
+                onPress={() => setDraftDiff(null)}
+              >
+                <Text style={[styles.chipText, draftDiff === null && styles.chipTextActive]}>전체</Text>
+              </TouchableOpacity>
+              {DIFFICULTIES.map((d) => (
+                <TouchableOpacity
+                  key={d.value}
+                  style={[styles.chip, draftDiff === d.value && styles.chipActive]}
+                  onPress={() => setDraftDiff(draftDiff === d.value ? null : d.value)}
+                >
+                  <Text style={[styles.chipText, draftDiff === d.value && styles.chipTextActive]}>{d.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* 카테고리 */}
+            <Text style={styles.sectionLabel}>카테고리</Text>
+            <View style={styles.chipWrap}>
+              <TouchableOpacity
+                style={[styles.chip, draftCat === null && styles.chipActive]}
+                onPress={() => setDraftCat(null)}
+              >
+                <Text style={[styles.chipText, draftCat === null && styles.chipTextActive]}>전체</Text>
+              </TouchableOpacity>
+              {CATEGORIES.map((c) => (
+                <TouchableOpacity
+                  key={c.key}
+                  style={[styles.chip, draftCat === c.key && styles.chipActive]}
+                  onPress={() => setDraftCat(draftCat === c.key ? null : c.key)}
+                >
+                  <Text style={[styles.chipText, draftCat === c.key && styles.chipTextActive]}>{c.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* 태그 */}
+            {allTags.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>태그</Text>
+                <View style={styles.chipWrap}>
+                  <TouchableOpacity
+                    style={[styles.chip, draftTag === null && styles.chipActive]}
+                    onPress={() => setDraftTag(null)}
+                  >
+                    <Text style={[styles.chipText, draftTag === null && styles.chipTextActive]}>전체</Text>
+                  </TouchableOpacity>
+                  {allTags.map((t) => (
+                    <TouchableOpacity
+                      key={t}
+                      style={[styles.chip, draftTag === t && styles.chipActive]}
+                      onPress={() => setDraftTag(draftTag === t ? null : t)}
+                    >
+                      <Text style={[styles.chipText, draftTag === t && styles.chipTextActive]}>{t}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+          </ScrollView>
+
+          <TouchableOpacity style={styles.applyBtn} onPress={applyFilter}>
+            <Text style={styles.applyBtnText}>적용하기</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F9FAFB" },
+  toolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  count: { fontSize: 14, color: "#6B7280", fontWeight: "500" },
+  toolbarRight: { flexDirection: "row", gap: 8, alignItems: "center" },
+  filterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    gap: 6,
+  },
+  filterBtnText: { fontSize: 13, fontWeight: "600", color: "#374151" },
+  filterBadge: {
+    backgroundColor: "#1A56DB",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: { fontSize: 11, color: "#FFFFFF", fontWeight: "700" },
+  addBtn: {
+    backgroundColor: "#059669",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  addBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  searchInput: {
+    flex: 1,
+    height: 38,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: "#111827",
+  },
+  clearBtn: { position: "absolute", right: 24, padding: 4 },
+  activeSummary: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#F0F9FF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#BAE6FD",
+    alignItems: "center",
+  },
+  activeChip: {
+    fontSize: 12,
+    color: "#0369A1",
+    backgroundColor: "#BAE6FD",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    fontWeight: "600",
+  },
+  clearAllText: { fontSize: 12, color: "#6B7280", textDecorationLine: "underline" },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
+  emptyIcon: { fontSize: 48 },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
+  emptyDesc: { fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 22 },
+  list: { padding: 16, gap: 10, paddingBottom: 32 },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    gap: 8,
+  },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  badges: { flexDirection: "row", flexWrap: "wrap", gap: 4, flex: 1, marginRight: 8 },
+  catBadge: {
+    fontSize: 11, color: "#6B7280", backgroundColor: "#F3F4F6",
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontWeight: "500",
+  },
+  dirBadge: {
+    fontSize: 11, color: "#059669", backgroundColor: "#D1FAE5",
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontWeight: "500",
+  },
+  tagBadge: {
+    fontSize: 11, color: "#6366F1", backgroundColor: "#EEF2FF",
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontWeight: "500",
+  },
+  extraBadge: {
+    fontSize: 11, color: "#9CA3AF", backgroundColor: "#F3F4F6",
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontWeight: "500",
+  },
+  diffText: { fontSize: 12, color: "#F59E0B" },
+  enText: { fontSize: 15, color: "#111827", lineHeight: 22 },
+  koText: { fontSize: 14, color: "#6B7280", lineHeight: 20 },
+  notesPreview: { fontSize: 12, color: "#92400E", lineHeight: 18 },
+  progressRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 2 },
+  progressText: { fontSize: 12, color: "#9CA3AF" },
+  overdueDot: { color: "#EF4444", fontWeight: "600" },
+
+  // 모달
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  sheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+    paddingBottom: 32,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: "#D1D5DB",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  sheetTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
+  resetText: { fontSize: 14, color: "#6B7280" },
+  sheetBody: { paddingHorizontal: 20, paddingTop: 8 },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+    marginTop: 16,
+    marginBottom: 10,
+  },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  chipActive: { backgroundColor: "#1A56DB", borderColor: "#1A56DB" },
+  chipText: { fontSize: 13, color: "#374151", fontWeight: "500" },
+  chipTextActive: { color: "#FFFFFF" },
+  applyBtn: {
+    margin: 16,
+    backgroundColor: "#1A56DB",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  applyBtnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
+});
