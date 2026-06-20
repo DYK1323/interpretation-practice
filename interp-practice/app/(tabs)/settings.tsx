@@ -17,7 +17,7 @@ import {
 import { getAllSettings, setSetting, getStringSetting, setStringSetting } from "../../src/db/settings";
 import { syncFromSheetUrl } from "../../src/utils/csvImport";
 import { exportCSV } from "../../src/utils/csvExport";
-import { exportProgressBackup, importProgressBackup } from "../../src/utils/progressBackup";
+import { exportFullBackup, importFullBackup } from "../../src/utils/fullBackup";
 import type { UserSettings } from "../../src/types";
 import { DEFAULT_SETTINGS } from "../../src/types";
 
@@ -34,8 +34,8 @@ export default function SettingsScreen() {
   const [sheetUrl, setSheetUrl] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportingProgress, setExportingProgress] = useState(false);
-  const [importingProgress, setImportingProgress] = useState(false);
+  const [exportingBackup, setExportingBackup] = useState(false);
+  const [importingBackup, setImportingBackup] = useState(false);
   const [limitModalVisible, setLimitModalVisible] = useState(false);
   const [limitInput, setLimitInput] = useState("");
   const limitInputRef = useRef<TextInput>(null);
@@ -88,36 +88,34 @@ export default function SettingsScreen() {
     }
   }
 
-  async function handleExportProgress() {
-    setExportingProgress(true);
+  async function handleExportBackup() {
+    setExportingBackup(true);
     try {
-      const count = await exportProgressBackup();
+      const { sentences, progress } = await exportFullBackup();
       if (Platform.OS === "android") {
-        ToastAndroid.show(`${count}개 진도 백업 완료`, ToastAndroid.SHORT);
+        ToastAndroid.show(`문장 ${sentences}개, 진도 ${progress}개 백업 완료`, ToastAndroid.SHORT);
       }
     } catch (e: any) {
       Alert.alert("백업 실패", e?.message ?? "알 수 없는 오류");
     } finally {
-      setExportingProgress(false);
+      setExportingBackup(false);
     }
   }
 
-  async function handleImportProgress() {
-    setImportingProgress(true);
+  async function handleImportBackup() {
+    setImportingBackup(true);
     try {
-      const { imported, failed } = await importProgressBackup();
-      if (imported === 0 && failed === 0) {
-        // user cancelled picker
-      } else {
+      const { sentences, progress, failed, canceled } = await importFullBackup();
+      if (!canceled) {
         Alert.alert(
           "복원 완료",
-          `${imported}개 복원됨${failed > 0 ? `, ${failed}개 실패` : ""}`
+          `문장 ${sentences}개, 진도 ${progress}개 복원됨${failed > 0 ? `\n(${failed}개 실패)` : ""}`
         );
       }
     } catch (e: any) {
       Alert.alert("복원 실패", e?.message ?? "알 수 없는 오류");
     } finally {
-      setImportingProgress(false);
+      setImportingBackup(false);
     }
   }
 
@@ -187,33 +185,33 @@ export default function SettingsScreen() {
         <Text style={styles.hint}>공유 창에서 구글 드라이브를 선택하세요</Text>
       </View>
 
-      {/* 학습 진도 백업 */}
+      {/* 전체 백업 */}
       <View style={styles.group}>
-        <Text style={styles.groupTitle}>학습 진도 백업</Text>
+        <Text style={styles.groupTitle}>전체 백업</Text>
         <Text style={styles.desc}>
-          복습 일정과 학습 횟수를 CSV로 백업합니다. 폰을 바꿔도 진도를 이어갈 수 있습니다.
+          문장과 학습 진도(복습 일정·횟수)를 하나의 파일로 백업합니다. 폰을 바꿔도 이어서 학습할 수 있습니다.
         </Text>
         <TouchableOpacity
-          style={[styles.actionBtn, exportingProgress && styles.actionBtnDisabled]}
-          onPress={handleExportProgress}
-          disabled={exportingProgress}
+          style={[styles.actionBtn, exportingBackup && styles.actionBtnDisabled]}
+          onPress={handleExportBackup}
+          disabled={exportingBackup}
         >
-          {exportingProgress
+          {exportingBackup
             ? <ActivityIndicator size="small" color="#FFFFFF" />
-            : <Text style={styles.actionBtnText}>진도 백업 내보내기</Text>
+            : <Text style={styles.actionBtnText}>전체 백업 내보내기</Text>
           }
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnSecondary, importingProgress && styles.actionBtnDisabled]}
-          onPress={handleImportProgress}
-          disabled={importingProgress}
+          style={[styles.actionBtn, styles.actionBtnSecondary, importingBackup && styles.actionBtnDisabled]}
+          onPress={handleImportBackup}
+          disabled={importingBackup}
         >
-          {importingProgress
+          {importingBackup
             ? <ActivityIndicator size="small" color="#1A56DB" />
-            : <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>진도 백업 복원하기</Text>
+            : <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>백업 파일로 복원하기</Text>
           }
         </TouchableOpacity>
-        <Text style={styles.hint}>복원 시 기존 진도에 덮어씌워집니다</Text>
+        <Text style={styles.hint}>복원 시 기존 문장·진도에 덮어씌워집니다</Text>
       </View>
 
       {/* 연습 설정 */}
