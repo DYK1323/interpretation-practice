@@ -299,7 +299,7 @@ export default function SentenceEdit() {
           <TextInput
             style={styles.textInput}
             multiline
-            placeholder="영→한 Step 5에 표시될 모범 통역문"
+            placeholder="3단계 비교 화면에서 원문 아래에 표시 (없으면 생략)"
             placeholderTextColor="#9CA3AF"
             value={modelKorean}
             onChangeText={setModelKorean}
@@ -311,7 +311,7 @@ export default function SentenceEdit() {
           <TextInput
             style={styles.textInput}
             multiline
-            placeholder="한→영 Step 5에 표시될 모범 통역문"
+            placeholder="3단계 비교 화면에서 원문 아래에 표시 (없으면 생략)"
             placeholderTextColor="#9CA3AF"
             value={modelEnglish}
             onChangeText={setModelEnglish}
