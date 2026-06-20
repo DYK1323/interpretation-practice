@@ -1,5 +1,5 @@
 import { getDB } from "./schema";
-import type { SentenceEntry, SentenceProgress, Direction, Category } from "../types";
+import type { SentenceEntry, SentenceProgress, Direction, Category, ForeignLanguage } from "../types";
 
 function rowToProgress(row: any): SentenceProgress {
   return {
@@ -9,6 +9,38 @@ function rowToProgress(row: any): SentenceProgress {
     intervalDays: row.interval_days,
     reviewCount: row.review_count,
     lastStudiedAt: row.last_studied_at,
+  };
+}
+
+function rowToSentence(row: any): SentenceEntry {
+  return {
+    id: row.id,
+    category: row.category,
+    difficulty: row.difficulty,
+    foreignLanguage: (row.foreign_language ?? "en") as ForeignLanguage,
+    englishText: row.english_text,
+    koreanText: row.korean_text ?? undefined,
+    englishAudio: row.english_audio_type === "file"
+      ? { type: "file" as const, uri: row.english_audio_uri }
+      : { type: "tts" as const },
+    koreanAudio: row.korean_audio_type === "file"
+      ? { type: "file" as const, uri: row.korean_audio_uri }
+      : { type: "tts" as const },
+    japaneseText: row.japanese_text ?? undefined,
+    japaneseAudio: row.japanese_audio_type === "file"
+      ? { type: "file" as const, uri: row.japanese_audio_uri }
+      : { type: "tts" as const },
+    chineseText: row.chinese_text ?? undefined,
+    chineseAudio: row.chinese_audio_type === "file"
+      ? { type: "file" as const, uri: row.chinese_audio_uri }
+      : { type: "tts" as const },
+    modelKorean: row.model_korean ?? undefined,
+    modelEnglish: row.model_english ?? undefined,
+    modelJapanese: row.model_japanese ?? undefined,
+    modelChinese: row.model_chinese ?? undefined,
+    tags: JSON.parse(row.tags ?? "[]"),
+    durationSeconds: row.duration_seconds ?? undefined,
+    notes: row.notes ?? undefined,
   };
 }
 
@@ -22,37 +54,27 @@ export async function getDueForReview(now: number = Date.now()): Promise<Sentenc
 }
 
 export async function getDueWithSentences(
-  now: number = Date.now()
+  now: number = Date.now(),
+  foreignLanguage?: ForeignLanguage
 ): Promise<Array<{ sentence: SentenceEntry; direction: Direction }>> {
   const db = await getDB();
+  const params: any[] = [now];
+  let langFilter = "";
+  if (foreignLanguage) {
+    langFilter = " AND s.foreign_language = ?";
+    params.push(foreignLanguage);
+  }
   const rows = await db.getAllAsync<any>(
     `SELECT s.*, sp.direction as sp_direction
      FROM sentence_progress sp
      JOIN sentences s ON s.id = sp.sentence_id
-     WHERE sp.next_review_date <= ? AND s.is_draft = 0
+     WHERE sp.next_review_date <= ? AND s.is_draft = 0${langFilter}
      ORDER BY sp.next_review_date ASC`,
-    [now]
+    params
   );
   return rows.map((row) => ({
     direction: row.sp_direction as Direction,
-    sentence: {
-      id: row.id,
-      category: row.category,
-      difficulty: row.difficulty,
-      englishText: row.english_text,
-      koreanText: row.korean_text ?? undefined,
-      englishAudio: row.english_audio_type === "file"
-        ? { type: "file" as const, uri: row.english_audio_uri }
-        : { type: "tts" as const },
-      koreanAudio: row.korean_audio_type === "file"
-        ? { type: "file" as const, uri: row.korean_audio_uri }
-        : { type: "tts" as const },
-      modelKorean: row.model_korean ?? undefined,
-      modelEnglish: row.model_english ?? undefined,
-      tags: JSON.parse(row.tags ?? "[]"),
-      durationSeconds: row.duration_seconds ?? undefined,
-      notes: row.notes ?? undefined,
-    } as SentenceEntry,
+    sentence: rowToSentence(row),
   }));
 }
 
@@ -64,13 +86,26 @@ export async function getNewSentences(
   const db = await getDB();
   const params: any[] = [direction];
   let filter = "";
+
+  // foreign_language filter derived from direction
+  const foreignLang = direction.replace("ko-", "").replace("-ko", "") === "ko"
+    ? "en"
+    : direction.startsWith("ko-")
+      ? direction.replace("ko-", "")
+      : direction.replace("-ko", "");
+  filter += " AND s.foreign_language = ?";
+  params.push(foreignLang === "ko" ? "en" : foreignLang);
+
   if (category) {
     filter += " AND s.category = ?";
     params.push(category);
   }
-  if (direction === "ko-en") {
+  if (direction === "ko-en" || direction === "ko-ja" || direction === "ko-zh") {
     filter += " AND s.korean_text IS NOT NULL";
   }
+  if (direction === "ja-ko") filter += " AND s.japanese_text IS NOT NULL";
+  if (direction === "zh-ko") filter += " AND s.chinese_text IS NOT NULL";
+
   params.push(limit);
 
   const rows = await db.getAllAsync<any>(
@@ -81,24 +116,7 @@ export async function getNewSentences(
      LIMIT ?`,
     params
   );
-  return rows.map((row) => ({
-    id: row.id,
-    category: row.category,
-    difficulty: row.difficulty,
-    englishText: row.english_text,
-    koreanText: row.korean_text ?? undefined,
-    englishAudio: row.english_audio_type === "file"
-      ? { type: "file" as const, uri: row.english_audio_uri }
-      : { type: "tts" as const },
-    koreanAudio: row.korean_audio_type === "file"
-      ? { type: "file" as const, uri: row.korean_audio_uri }
-      : { type: "tts" as const },
-    modelKorean: row.model_korean ?? undefined,
-    modelEnglish: row.model_english ?? undefined,
-    tags: JSON.parse(row.tags ?? "[]"),
-    durationSeconds: row.duration_seconds ?? undefined,
-    notes: row.notes ?? undefined,
-  } as SentenceEntry));
+  return rows.map(rowToSentence);
 }
 
 export async function getProgress(

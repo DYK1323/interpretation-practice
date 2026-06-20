@@ -61,6 +61,23 @@ async function _runInit(): Promise<void> {
   if (!sentenceCols.some(c => c.name === "is_draft")) {
     await database.execAsync(`ALTER TABLE sentences ADD COLUMN is_draft INTEGER NOT NULL DEFAULT 0`);
   }
+  if (!sentenceCols.some(c => c.name === "foreign_language")) {
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN foreign_language TEXT NOT NULL DEFAULT 'en'`);
+  }
+  if (!sentenceCols.some(c => c.name === "japanese_text")) {
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN japanese_text TEXT`);
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN japanese_audio_type TEXT DEFAULT 'tts'`);
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN japanese_audio_uri TEXT`);
+  }
+  if (!sentenceCols.some(c => c.name === "chinese_text")) {
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN chinese_text TEXT`);
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN chinese_audio_type TEXT DEFAULT 'tts'`);
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN chinese_audio_uri TEXT`);
+  }
+  if (!sentenceCols.some(c => c.name === "model_japanese")) {
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN model_japanese TEXT`);
+    await database.execAsync(`ALTER TABLE sentences ADD COLUMN model_chinese TEXT`);
+  }
 
   const progressCols = await database.getAllAsync<{ name: string }>(`PRAGMA table_info(sentence_progress)`);
   if (!progressCols.some(c => c.name === "first_studied_at")) {

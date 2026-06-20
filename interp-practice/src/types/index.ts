@@ -1,4 +1,6 @@
-export type Direction = "en-ko" | "ko-en";
+export type ForeignLanguage = "en" | "ja" | "zh";
+
+export type Direction = "en-ko" | "ko-en" | "ja-ko" | "ko-ja" | "zh-ko" | "ko-zh";
 
 export type Category = "news" | "business" | "conference" | "daily";
 
@@ -10,12 +12,19 @@ export interface SentenceEntry {
   id: string;
   category: Category;
   difficulty: 1 | 2 | 3;
+  foreignLanguage: ForeignLanguage;
   englishText: string;
   koreanText?: string;
   englishAudio?: AudioSource;
   koreanAudio?: AudioSource;
+  japaneseText?: string;
+  japaneseAudio?: AudioSource;
+  chineseText?: string;
+  chineseAudio?: AudioSource;
   modelKorean?: string;
   modelEnglish?: string;
+  modelJapanese?: string;
+  modelChinese?: string;
   tags: string[];
   durationSeconds?: number;
   notes?: string;
@@ -47,6 +56,7 @@ export interface UserSettings {
   playbackSpeed: 0.5 | 0.75 | 1.0;
   shuffleSentences: boolean;
   dailyNewLimit: number;
+  foreignLanguage: ForeignLanguage;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -54,6 +64,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   playbackSpeed: 1.0,
   shuffleSentences: true,
   dailyNewLimit: 10,
+  foreignLanguage: "en",
 };
 
 export type SessionStep =
