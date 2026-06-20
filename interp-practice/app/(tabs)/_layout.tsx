@@ -1,9 +1,5 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
-
-function Icon({ emoji, focused }: { emoji: string; focused: boolean }) {
-  return <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>;
-}
+import { Ionicons } from "@expo/vector-icons";
 
 export default function TabsLayout() {
   return (
@@ -22,7 +18,7 @@ export default function TabsLayout() {
         options={{
           title: "연습",
           headerTitle: "통역 연습",
-          tabBarIcon: ({ focused }) => <Icon emoji="🎙️" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="mic" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -30,7 +26,7 @@ export default function TabsLayout() {
         options={{
           title: "라이브러리",
           headerTitle: "문장 라이브러리",
-          tabBarIcon: ({ focused }) => <Icon emoji="📚" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="library" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -38,7 +34,7 @@ export default function TabsLayout() {
         options={{
           title: "히스토리",
           headerTitle: "학습 기록",
-          tabBarIcon: ({ focused }) => <Icon emoji="📋" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="list" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -46,7 +42,7 @@ export default function TabsLayout() {
         options={{
           title: "설정",
           headerTitle: "설정",
-          tabBarIcon: ({ focused }) => <Icon emoji="⚙️" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="settings" size={size} color={color} />,
         }}
       />
     </Tabs>

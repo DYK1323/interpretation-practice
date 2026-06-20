@@ -13,15 +13,10 @@ import {
   Pressable,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { getAllSentences, deleteSentence } from "../../../src/db/sentences";
-import type { SentenceEntry, Category } from "../../../src/types";
-
-const CATEGORIES: { key: Category; label: string }[] = [
-  { key: "news",        label: "뉴스" },
-  { key: "business",   label: "비즈니스" },
-  { key: "conference", label: "회의" },
-  { key: "daily",      label: "일상" },
-];
+import { CATEGORIES, CATEGORY_LABELS } from "../../../src/constants";
+import type { SentenceEntry, Category } from "../../../src/types/index";
 
 const DIFFICULTIES = [
   { value: 1 as const, label: "★☆☆" },
@@ -40,7 +35,6 @@ export default function LibraryIndex() {
   const [filterCat, setFilterCat] = useState<Category | null>(null);
   const [filterTag, setFilterTag] = useState<string | null>(null);
 
-  // draft state inside modal
   const [draftDiff, setDraftDiff] = useState<1 | 2 | 3 | null>(null);
   const [draftCat, setDraftCat] = useState<Category | null>(null);
   const [draftTag, setDraftTag] = useState<string | null>(null);
@@ -152,7 +146,7 @@ export default function LibraryIndex() {
         />
         {query.length > 0 && (
           <TouchableOpacity onPress={() => setQuery("")} style={styles.clearBtn}>
-            <Text style={styles.clearBtnText}>✕</Text>
+            <Ionicons name="close-circle" size={18} color="#9CA3AF" />
           </TouchableOpacity>
         )}
       </View>
@@ -191,33 +185,43 @@ export default function LibraryIndex() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => router.push(`/library-edit/${item.id}`)}
-              onLongPress={() => handleDelete(item.id)}
-            >
-              <View style={styles.cardHeader}>
-                <View style={styles.badges}>
-                  <Text style={styles.catBadge}>{item.category}</Text>
-                  {item.koreanText && <Text style={styles.dirBadge}>양방향</Text>}
-                  {item.tags.map((t) => (
-                    <Text key={t} style={styles.tagBadge}>{t}</Text>
-                  ))}
+          ListFooterComponent={
+            <Text style={styles.deleteHint}>문장을 길게 누르면 삭제됩니다</Text>
+          }
+          renderItem={({ item }) => {
+            const displayTags = item.tags.slice(0, 3);
+            const extraCount = item.tags.length - 3;
+            return (
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() => router.push(`/library-edit/${item.id}`)}
+                onLongPress={() => handleDelete(item.id)}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={styles.badges}>
+                    <Text style={styles.catBadge}>{CATEGORY_LABELS[item.category]}</Text>
+                    {item.koreanText && <Text style={styles.dirBadge}>양방향</Text>}
+                    {displayTags.map((t) => (
+                      <Text key={t} style={styles.tagBadge}>{t}</Text>
+                    ))}
+                    {extraCount > 0 && (
+                      <Text style={styles.extraBadge}>+{extraCount}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.diffText}>
+                    {"★".repeat(item.difficulty) + "☆".repeat(3 - item.difficulty)}
+                  </Text>
                 </View>
-                <Text style={styles.diffText}>
-                  {"★".repeat(item.difficulty) + "☆".repeat(3 - item.difficulty)}
-                </Text>
-              </View>
-              <Text style={styles.enText} numberOfLines={2}>{item.englishText}</Text>
-              {item.koreanText && (
-                <Text style={styles.koText} numberOfLines={1}>{item.koreanText}</Text>
-              )}
-              {item.notes && (
-                <Text style={styles.notesPreview} numberOfLines={1}>📝 {item.notes}</Text>
-              )}
-            </TouchableOpacity>
-          )}
+                <Text style={styles.enText} numberOfLines={2}>{item.englishText}</Text>
+                {item.koreanText && (
+                  <Text style={styles.koText} numberOfLines={1}>{item.koreanText}</Text>
+                )}
+                {item.notes && (
+                  <Text style={styles.notesPreview} numberOfLines={1}>📝 {item.notes}</Text>
+                )}
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
 
@@ -375,7 +379,6 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   clearBtn: { position: "absolute", right: 24, padding: 4 },
-  clearBtnText: { fontSize: 13, color: "#9CA3AF" },
   activeSummary: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -402,7 +405,13 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 48 },
   emptyTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
   emptyDesc: { fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 22 },
-  list: { padding: 16, gap: 10 },
+  list: { padding: 16, gap: 10, paddingBottom: 32 },
+  deleteHint: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
+    paddingVertical: 8,
+  },
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
@@ -423,6 +432,10 @@ const styles = StyleSheet.create({
   },
   tagBadge: {
     fontSize: 11, color: "#6366F1", backgroundColor: "#EEF2FF",
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontWeight: "500",
+  },
+  extraBadge: {
+    fontSize: 11, color: "#9CA3AF", backgroundColor: "#F3F4F6",
     paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontWeight: "500",
   },
   diffText: { fontSize: 12, color: "#F59E0B" },

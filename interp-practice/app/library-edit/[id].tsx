@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -10,17 +10,13 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import * as FileSystem from "expo-file-system";
+import { Ionicons } from "@expo/vector-icons";
 import { getSentenceById, upsertSentence, updateSentenceAudio } from "../../src/db/sentences";
 import { RecordButton } from "../../src/components/RecordButton";
 import { AudioPlayer } from "../../src/components/AudioPlayer";
-import type { SentenceEntry, Category } from "../../src/types";
-
-const CATEGORIES: { value: Category; label: string }[] = [
-  { value: "news",        label: "뉴스" },
-  { value: "business",   label: "비즈니스" },
-  { value: "conference", label: "컨퍼런스" },
-  { value: "daily",      label: "일상" },
-];
+import { CATEGORIES } from "../../src/constants";
+import type { SentenceEntry, Category } from "../../src/types/index";
 
 const DIFFICULTIES: { value: 1 | 2 | 3; label: string }[] = [
   { value: 1, label: "★☆☆" },
@@ -36,6 +32,7 @@ export default function SentenceEdit() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const isNew = id === "new";
+  const savingRef = useRef(false);
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -76,10 +73,12 @@ export default function SentenceEdit() {
   }
 
   async function handleSave() {
+    if (savingRef.current) return;
     if (!englishText.trim()) {
       Alert.alert("오류", "영어 원문을 입력해주세요.");
       return;
     }
+    savingRef.current = true;
     setSaving(true);
     const sentenceId = savedId ?? makeNewId();
     const entry: SentenceEntry = {
@@ -107,16 +106,50 @@ export default function SentenceEdit() {
       Alert.alert("오류", `저장 실패: ${e?.message ?? String(e)}`);
     } finally {
       setSaving(false);
+      savingRef.current = false;
     }
   }
 
   async function handleRecordingComplete(uri: string) {
     if (!recordingLang || !savedId) return;
-    await updateSentenceAudio(savedId, recordingLang, uri);
-    if (recordingLang === "english") setEnAudio({ type: "file", uri });
-    else setKoAudio({ type: "file", uri });
-    setRecordingLang(null);
-    Alert.alert("저장됨", `${recordingLang === "english" ? "영어" : "한국어"} 음성이 저장됐습니다.`);
+    const existingAudio = recordingLang === "english" ? enAudio : koAudio;
+    const lang = recordingLang;
+
+    const doSave = async () => {
+      await updateSentenceAudio(savedId, lang, uri);
+      if (lang === "english") setEnAudio({ type: "file", uri });
+      else setKoAudio({ type: "file", uri });
+      setRecordingLang(null);
+      Alert.alert("저장됨", `${lang === "english" ? "영어" : "한국어"} 음성이 저장됐습니다.`);
+    };
+
+    if (existingAudio?.type === "file") {
+      Alert.alert(
+        "기존 음성 덮어쓰기",
+        "기존 녹음을 새 녹음으로 교체할까요?",
+        [
+          {
+            text: "취소",
+            style: "cancel",
+            onPress: () => setRecordingLang(null),
+          },
+          {
+            text: "교체",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await FileSystem.deleteAsync(existingAudio.uri, { idempotent: true });
+              } catch {
+                // old file may already be missing; proceed
+              }
+              await doSave();
+            },
+          },
+        ]
+      );
+    } else {
+      await doSave();
+    }
   }
 
   if (loading) {
@@ -145,11 +178,11 @@ export default function SentenceEdit() {
           <View style={styles.chipRow}>
             {CATEGORIES.map(c => (
               <TouchableOpacity
-                key={c.value}
-                style={[styles.chip, category === c.value && styles.chipActive]}
-                onPress={() => setCategory(c.value)}
+                key={c.key}
+                style={[styles.chip, category === c.key && styles.chipActive]}
+                onPress={() => setCategory(c.key)}
               >
-                <Text style={[styles.chipText, category === c.value && styles.chipTextActive]}>
+                <Text style={[styles.chipText, category === c.key && styles.chipTextActive]}>
                   {c.label}
                 </Text>
               </TouchableOpacity>
@@ -201,8 +234,9 @@ export default function SentenceEdit() {
                   style={styles.recordBtn}
                   onPress={() => setRecordingLang(recordingLang === "english" ? null : "english")}
                 >
+                  <Ionicons name="mic-outline" size={16} color="#374151" />
                   <Text style={styles.recordBtnText}>
-                    {enAudio?.type === "file" ? "🎙️ 재녹음" : "🎙️ 녹음"}
+                    {enAudio?.type === "file" ? "재녹음" : "녹음"}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -242,8 +276,9 @@ export default function SentenceEdit() {
                   style={styles.recordBtn}
                   onPress={() => setRecordingLang(recordingLang === "korean" ? null : "korean")}
                 >
+                  <Ionicons name="mic-outline" size={16} color="#374151" />
                   <Text style={styles.recordBtnText}>
-                    {koAudio?.type === "file" ? "🎙️ 재녹음" : "🎙️ 녹음"}
+                    {koAudio?.type === "file" ? "재녹음" : "녹음"}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -360,6 +395,9 @@ const styles = StyleSheet.create({
   notesInput: { minHeight: 100, backgroundColor: "#FFFBEB", borderColor: "#FDE68A" },
   audioRow: { flexDirection: "row", gap: 10, alignItems: "center", marginTop: 10 },
   recordBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 10,

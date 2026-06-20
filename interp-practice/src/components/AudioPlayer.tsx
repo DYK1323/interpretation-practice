@@ -8,12 +8,19 @@ import {
 } from "react-native";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as Speech from "expo-speech";
+import { Ionicons } from "@expo/vector-icons";
 
 interface Props {
-  /** Source: uri for file playback, or text for TTS */
   source: { type: "file"; uri: string } | { type: "tts"; text: string; language?: string };
   speed?: number;
   onPlayEnd?: () => void;
+}
+
+function formatTime(seconds: number): string {
+  const s = Math.floor(seconds);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
 export function AudioPlayer({ source, speed = 1.0, onPlayEnd }: Props) {
@@ -22,11 +29,13 @@ export function AudioPlayer({ source, speed = 1.0, onPlayEnd }: Props) {
   );
   const status = useAudioPlayerStatus(player);
   const [ttsPlaying, setTtsPlaying] = useState(false);
+  const [finished, setFinished] = useState(false);
   const onPlayEndRef = useRef(onPlayEnd);
   onPlayEndRef.current = onPlayEnd;
 
   useEffect(() => {
     if (source.type === "file" && status.didJustFinish) {
+      setFinished(true);
       onPlayEndRef.current?.();
     }
   }, [status.didJustFinish, source.type]);
@@ -53,37 +62,56 @@ export function AudioPlayer({ source, speed = 1.0, onPlayEnd }: Props) {
       if (status.playing) {
         player.pause();
       } else {
-        player.seekTo(0);
+        if (finished) {
+          player.seekTo(0);
+          setFinished(false);
+        }
         player.play();
       }
     }
   };
 
-  const isActive =
-    source.type === "tts" ? ttsPlaying : status.playing;
+  const isActive = source.type === "tts" ? ttsPlaying : status.playing;
   const isLoading = source.type === "file" && !status.isLoaded;
 
+  const duration = status.duration ?? 0;
+  const currentTime = status.currentTime ?? 0;
+  const progress = duration > 0 ? currentTime / duration : 0;
+
   return (
-    <TouchableOpacity
-      style={[styles.button, isActive && styles.buttonActive]}
-      onPress={handlePress}
-      disabled={isLoading}
-    >
-      {isLoading ? (
-        <ActivityIndicator color="#1A56DB" size="small" />
-      ) : (
-        <Text style={[styles.icon, isActive && styles.iconActive]}>
-          {isActive ? "⏸" : "▶"}
+    <View style={styles.wrapper}>
+      <TouchableOpacity
+        style={[styles.button, isActive && styles.buttonActive]}
+        onPress={handlePress}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#1A56DB" size="small" />
+        ) : (
+          <Ionicons name={isActive ? "pause" : "play"} size={18} color="#1A56DB" />
+        )}
+        <Text style={[styles.label, isActive && styles.labelActive]}>
+          {isActive ? "재생 중..." : "듣기"}
         </Text>
+      </TouchableOpacity>
+      {source.type === "file" && (
+        <View style={styles.progressRow}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` as any }]} />
+          </View>
+          <Text style={styles.timeText}>
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </Text>
+        </View>
       )}
-      <Text style={[styles.label, isActive && styles.labelActive]}>
-        {isActive ? "재생 중..." : "듣기"}
-      </Text>
-    </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    gap: 6,
+  },
   button: {
     flexDirection: "row",
     alignItems: "center",
@@ -98,13 +126,6 @@ const styles = StyleSheet.create({
   buttonActive: {
     backgroundColor: "#EBF2FF",
   },
-  icon: {
-    fontSize: 18,
-    color: "#1A56DB",
-  },
-  iconActive: {
-    color: "#1A56DB",
-  },
   label: {
     fontSize: 16,
     fontWeight: "600",
@@ -112,5 +133,30 @@ const styles = StyleSheet.create({
   },
   labelActive: {
     color: "#1A56DB",
+  },
+  progressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 3,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: 3,
+    backgroundColor: "#1A56DB",
+    borderRadius: 2,
+  },
+  timeText: {
+    fontSize: 11,
+    color: "#9CA3AF",
+    fontVariant: ["tabular-nums"],
+    minWidth: 72,
+    textAlign: "right",
   },
 });

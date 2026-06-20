@@ -5,8 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  Alert,
 } from "react-native";
 import { useAudioRecorder, RecordingPresets, setAudioModeAsync } from "expo-audio";
+import { Ionicons } from "@expo/vector-icons";
 
 interface Props {
   onRecordingComplete: (uri: string) => void;
@@ -60,6 +62,8 @@ export function RecordButton({ onRecordingComplete, onRecordingStart }: Props) {
       const uri = recorder.uri;
       if (uri) {
         onRecordingComplete(uri);
+      } else {
+        Alert.alert("녹음 오류", "녹음 파일을 저장하지 못했습니다. 다시 시도하세요.");
       }
     } else {
       await recorder.prepareToRecordAsync();
@@ -80,7 +84,11 @@ export function RecordButton({ onRecordingComplete, onRecordingStart }: Props) {
           onPress={handlePress}
           activeOpacity={0.8}
         >
-          <Text style={styles.icon}>{isRecording ? "■" : "●"}</Text>
+          <Ionicons
+            name={isRecording ? "stop-circle" : "mic"}
+            size={32}
+            color="#FFFFFF"
+          />
         </TouchableOpacity>
       </Animated.View>
       <Text style={styles.label}>
@@ -117,10 +125,6 @@ const styles = StyleSheet.create({
   buttonRecording: {
     backgroundColor: "#EF4444",
     shadowColor: "#EF4444",
-  },
-  icon: {
-    fontSize: 28,
-    color: "#FFFFFF",
   },
   label: {
     fontSize: 14,

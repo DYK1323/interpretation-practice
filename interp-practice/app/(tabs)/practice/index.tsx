@@ -14,16 +14,10 @@ import { getHeatmapData, getStats } from "../../../src/db/results";
 import { getAllSettings } from "../../../src/db/settings";
 import { useSessionStore } from "../../../src/features/session/useSessionStore";
 import { Heatmap } from "../../../src/components/Heatmap";
-import type { Direction, Category, UserSettings } from "../../../src/types";
-import { DEFAULT_SETTINGS } from "../../../src/types";
+import { CATEGORIES } from "../../../src/constants";
+import type { Direction, Category, UserSettings } from "../../../src/types/index";
+import { DEFAULT_SETTINGS } from "../../../src/types/index";
 import type { QueueItem } from "../../../src/features/session/useSessionStore";
-
-const CATEGORIES: { key: Category; label: string }[] = [
-  { key: "news",        label: "뉴스" },
-  { key: "business",   label: "비즈니스" },
-  { key: "conference", label: "회의/강연" },
-  { key: "daily",      label: "일상" },
-];
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -81,13 +75,6 @@ export default function PracticeHome() {
     setLoading(false);
   }
 
-  // Reload new sentence count when filters change without full reload
-  useFocusEffect(
-    useCallback(() => {
-      // Already handled by the main loadData above (it runs on direction/category change)
-    }, [])
-  );
-
   function handleStart() {
     let queue = [...queueCache.due, ...queueCache.newItems];
     if (queue.length === 0) {
@@ -111,7 +98,6 @@ export default function PracticeHome() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={{ fontSize: 10, color: "#9CA3AF", textAlign: "center", marginBottom: 4 }}>v4-swap</Text>
       {/* 통계 */}
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
@@ -266,27 +252,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   newBadgeText: { fontSize: 12, fontWeight: "700", color: "#059669" },
-  queueSummary: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  queueBadge: {
-    alignItems: "center",
-    backgroundColor: "#EBF2FF",
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    gap: 2,
-  },
-  queueBadgeNew: { backgroundColor: "#F0FDF4" },
-  queueBadgeNum: { fontSize: 22, fontWeight: "700", color: "#1A56DB" },
-  queueBadgeNumNew: { color: "#059669" },
-  queueBadgeLabel: { fontSize: 11, color: "#1A56DB", fontWeight: "500" },
-  queueBadgeLabelNew: { color: "#059669" },
-  queuePlus: { fontSize: 18, color: "#9CA3AF", fontWeight: "300" },
-  queueEquals: { fontSize: 18, color: "#9CA3AF", fontWeight: "300" },
-  queueTotal: { fontSize: 22, fontWeight: "700", color: "#111827" },
   filterSection: { gap: 8 },
   filterLabel: { fontSize: 12, fontWeight: "600", color: "#6B7280", marginTop: 4 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import type { SessionStep } from "../types";
+import { Ionicons } from "@expo/vector-icons";
+import type { SessionStep } from "../types/index";
 import { STEP_LABELS, getStepIndex } from "../features/session/sessionMachine";
 
 const STEPS: SessionStep[] = [
@@ -24,21 +25,27 @@ export function StepIndicator({ currentStep }: Props) {
         return (
           <React.Fragment key={step}>
             <View style={styles.stepWrapper}>
-              <View
-                style={[
-                  styles.circle,
-                  done && styles.circleDone,
-                  active && styles.circleActive,
-                ]}
-              >
-                <Text
+              <View style={[styles.outerRing, active && styles.outerRingActive]}>
+                <View
                   style={[
-                    styles.circleText,
-                    (done || active) && styles.circleTextActive,
+                    styles.circle,
+                    done && styles.circleDone,
+                    active && styles.circleActive,
                   ]}
                 >
-                  {idx + 1}
-                </Text>
+                  {done ? (
+                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.circleText,
+                        active && styles.circleTextActive,
+                      ]}
+                    >
+                      {idx + 1}
+                    </Text>
+                  )}
+                </View>
               </View>
               <Text
                 style={[styles.label, active && styles.labelActive]}
@@ -66,7 +73,19 @@ const styles = StyleSheet.create({
   },
   stepWrapper: {
     alignItems: "center",
-    width: 44,
+    width: 52,
+  },
+  outerRing: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  outerRingActive: {
+    borderColor: "#1A56DB",
   },
   circle: {
     width: 28,

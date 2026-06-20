@@ -8,10 +8,12 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { getAllResults } from "../../src/db/results";
 import { getSentencesByIds } from "../../src/db/sentences";
 import { AudioPlayer } from "../../src/components/AudioPlayer";
-import type { SessionResult, SentenceEntry } from "../../src/types";
+import { CATEGORY_LABELS } from "../../src/constants";
+import type { SessionResult, SentenceEntry } from "../../src/types/index";
 
 interface ResultWithSentence {
   result: SessionResult;
@@ -28,12 +30,17 @@ export default function HistoryScreen() {
       let cancelled = false;
       setLoading(true);
       (async () => {
-        const results = await getAllResults(100);
-        const ids = [...new Set(results.map(r => r.sentenceId))];
-        const sentenceMap = await getSentencesByIds(ids);
-        if (cancelled) return;
-        setItems(results.map(r => ({ result: r, sentence: sentenceMap[r.sentenceId] ?? null })));
-        setLoading(false);
+        try {
+          const results = await getAllResults(100);
+          const ids = [...new Set(results.map(r => r.sentenceId))];
+          const sentenceMap = await getSentencesByIds(ids);
+          if (cancelled) return;
+          setItems(results.map(r => ({ result: r, sentence: sentenceMap[r.sentenceId] ?? null })));
+        } catch {
+          // fall through — show empty list
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
       })();
       return () => { cancelled = true; };
     }, [])
@@ -85,7 +92,9 @@ export default function HistoryScreen() {
                 <Text style={styles.dirBadge}>
                   {result.direction === "en-ko" ? "영→한" : "한→영"}
                 </Text>
-                {sentence && <Text style={styles.catBadge}>{sentence.category}</Text>}
+                {sentence && (
+                  <Text style={styles.catBadge}>{CATEGORY_LABELS[sentence.category]}</Text>
+                )}
               </View>
               <Text style={styles.dateText}>{formatDate(result.timestamp)}</Text>
             </View>
@@ -126,7 +135,13 @@ export default function HistoryScreen() {
               </View>
             )}
 
-            <Text style={styles.expandHint}>{isExpanded ? "접기 ▲" : "펼치기 ▼"}</Text>
+            <View style={styles.expandHintRow}>
+              <Ionicons
+                name={isExpanded ? "chevron-up" : "chevron-down"}
+                size={14}
+                color="#9CA3AF"
+              />
+            </View>
           </TouchableOpacity>
         );
       }}
@@ -197,5 +212,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FDE68A",
   },
-  expandHint: { fontSize: 12, color: "#9CA3AF", textAlign: "right" },
+  expandHintRow: { alignItems: "flex-end" },
 });
