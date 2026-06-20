@@ -320,18 +320,21 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.columnGuide}>
                 <Text style={styles.columnGuideTitle}>1행(헤더) 컬럼명</Text>
-                <Text style={styles.columnGuideRow}>
-                  <Text style={styles.columnRequired}>필수  </Text>
-                  <Text style={styles.columnName}>englishText</Text>
-                </Text>
-                <Text style={styles.columnGuideRow}>
-                  <Text style={styles.columnOptional}>권장  </Text>
-                  <Text style={styles.columnName}>koreanText · category · difficulty</Text>
-                </Text>
-                <Text style={styles.columnGuideRow}>
-                  <Text style={styles.columnOptional}>선택  </Text>
-                  <Text style={styles.columnName}>modelKorean · modelEnglish · tags · notes</Text>
-                </Text>
+                {([
+                  { name: "englishText",   desc: "영어 원문",                        required: true },
+                  { name: "koreanText",    desc: "한국어 번역",                       required: false },
+                  { name: "category",      desc: "분류 (news/business/conference/daily)", required: false },
+                  { name: "difficulty",    desc: "난이도 (1·2·3)",                   required: false },
+                  { name: "modelKorean",   desc: "모범 한국어 통역문",                required: false },
+                  { name: "modelEnglish",  desc: "모범 영어 통역문",                  required: false },
+                  { name: "tags",          desc: "태그 (|로 구분)",                   required: false },
+                  { name: "notes",         desc: "메모",                             required: false },
+                ] as const).map(({ name, desc, required }) => (
+                  <View key={name} style={styles.columnRow}>
+                    <Text style={[styles.columnName, required && styles.columnNameRequired]}>{name}</Text>
+                    <Text style={styles.columnDesc}>{required ? "[필수] " : ""}{desc}</Text>
+                  </View>
+                ))}
                 <Text style={styles.columnGuideHint}>
                   앱에서 내보낸 CSV를 구글 시트로 열면 헤더가 자동으로 맞춰집니다.
                 </Text>
@@ -532,14 +535,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FAFB",
     borderRadius: 8,
     padding: 12,
-    gap: 6,
+    gap: 5,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
   columnGuideTitle: { fontSize: 12, fontWeight: "700", color: "#6B7280", marginBottom: 2 },
-  columnGuideRow: { fontSize: 12, color: "#374151", lineHeight: 18 },
-  columnRequired: { color: "#DC2626", fontWeight: "700" },
-  columnOptional: { color: "#6B7280", fontWeight: "600" },
-  columnName: { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", color: "#1A56DB" },
+  columnRow: { flexDirection: "row", alignItems: "baseline", gap: 6 },
+  columnName: { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", fontSize: 11, color: "#1A56DB", minWidth: 100 },
+  columnNameRequired: { color: "#DC2626" },
+  columnDesc: { fontSize: 11, color: "#6B7280", flex: 1, lineHeight: 16 },
   columnGuideHint: { fontSize: 11, color: "#9CA3AF", lineHeight: 16, marginTop: 4 },
 });
