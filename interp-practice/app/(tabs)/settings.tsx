@@ -309,7 +309,7 @@ export default function SettingsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>시트 공유 설정 확인</Text>
+            <Text style={styles.modalTitle}>시트 공유 설정을 미리 확인해주세요</Text>
             <View style={styles.stepList}>
               <Text style={styles.stepItem}>① 구글 스프레드시트를 엽니다.</Text>
               <Text style={styles.stepItem}>② 오른쪽 상단 <Text style={styles.stepEmphasis}>공유</Text> 버튼을 누릅니다.</Text>
