@@ -33,6 +33,8 @@ export default function SettingsScreen() {
   const [sheetUrl, setSheetUrl] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportGuideVisible, setExportGuideVisible] = useState(false);
+  const [syncGuideVisible, setSyncGuideVisible] = useState(false);
   const [limitModalVisible, setLimitModalVisible] = useState(false);
   const [limitInput, setLimitInput] = useState("");
   const limitInputRef = useRef<TextInput>(null);
@@ -64,12 +66,18 @@ export default function SettingsScreen() {
     setLimitInput("");
   }
 
-  async function handleSync() {
+  function handleSyncPress() {
     const url = sheetUrl.trim();
     if (!url) {
       Alert.alert("URL 필요", "구글 시트 공유 링크를 입력하세요.");
       return;
     }
+    setSyncGuideVisible(true);
+  }
+
+  async function handleSync() {
+    setSyncGuideVisible(false);
+    const url = sheetUrl.trim();
     await setStringSetting("sheetSyncUrl", url);
     setSyncing(true);
     try {
@@ -86,6 +94,7 @@ export default function SettingsScreen() {
   }
 
   async function handleExport() {
+    setExportGuideVisible(false);
     setExporting(true);
     try {
       const count = await exportCSV();
@@ -122,7 +131,7 @@ export default function SettingsScreen() {
         />
         <TouchableOpacity
           style={[styles.actionBtn, syncing && styles.actionBtnDisabled]}
-          onPress={handleSync}
+          onPress={handleSyncPress}
           disabled={syncing}
         >
           {syncing
@@ -140,7 +149,7 @@ export default function SettingsScreen() {
         </Text>
         <TouchableOpacity
           style={[styles.actionBtn, styles.actionBtnSecondary, exporting && styles.actionBtnDisabled]}
-          onPress={handleExport}
+          onPress={() => setExportGuideVisible(true)}
           disabled={exporting}
         >
           {exporting
@@ -148,6 +157,7 @@ export default function SettingsScreen() {
             : <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>CSV 내보내기</Text>
           }
         </TouchableOpacity>
+
         <Text style={styles.hint}>공유 창에서 구글 드라이브를 선택하세요</Text>
       </View>
 
@@ -262,6 +272,61 @@ export default function SettingsScreen() {
         </View>
       </View>
     </ScrollView>
+
+      {/* 내보내기 안내 */}
+      <Modal
+        visible={exportGuideVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExportGuideVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>CSV 내보내기 안내</Text>
+            <View style={styles.stepList}>
+              <Text style={styles.stepItem}>① 공유 창이 열리면 <Text style={styles.stepEmphasis}>구글 드라이브</Text>를 선택하세요.</Text>
+              <Text style={styles.stepItem}>② 드라이브에 저장해 두면 폰을 바꿔도 복원할 수 있습니다.</Text>
+              <Text style={styles.stepItem}>③ 복원할 때는 파일을 구글 시트로 열어 동기화 URL로 입력하세요.</Text>
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setExportGuideVisible(false)}>
+                <Text style={styles.modalCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleExport}>
+                <Text style={styles.modalConfirmText}>내보내기 시작</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 동기화 안내 */}
+      <Modal
+        visible={syncGuideVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSyncGuideVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>시트 공유 설정 확인</Text>
+            <View style={styles.stepList}>
+              <Text style={styles.stepItem}>① 구글 스프레드시트를 엽니다.</Text>
+              <Text style={styles.stepItem}>② 오른쪽 상단 <Text style={styles.stepEmphasis}>공유</Text> 버튼을 누릅니다.</Text>
+              <Text style={styles.stepItem}>③ <Text style={styles.stepEmphasis}>"링크 있는 모든 사용자"</Text> → <Text style={styles.stepEmphasis}>"뷰어"</Text>로 설정합니다.</Text>
+              <Text style={styles.stepItem}>④ 링크를 복사해 위 입력칸에 붙여넣습니다.</Text>
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSyncGuideVisible(false)}>
+                <Text style={styles.modalCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSync}>
+                <Text style={styles.modalConfirmText}>동기화 시작</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={limitModalVisible}
@@ -401,6 +466,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   modalTitle: { fontSize: 16, fontWeight: "700", color: "#111827", textAlign: "center" },
+  stepList: { gap: 10 },
+  stepItem: { fontSize: 13, color: "#374151", lineHeight: 20 },
+  stepEmphasis: { fontWeight: "700", color: "#1A56DB" },
   modalInput: {
     borderWidth: 1,
     borderColor: "#E5E7EB",
