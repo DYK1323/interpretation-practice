@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { getAllResults } from "../../src/db/results";
-import { getSentenceById } from "../../src/db/sentences";
+import { getSentencesByIds } from "../../src/db/sentences";
 import { AudioPlayer } from "../../src/components/AudioPlayer";
 import type { SessionResult, SentenceEntry } from "../../src/types";
 
@@ -25,22 +25,19 @@ export default function HistoryScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      let cancelled = false;
+      setLoading(true);
+      (async () => {
+        const results = await getAllResults(100);
+        const ids = [...new Set(results.map(r => r.sentenceId))];
+        const sentenceMap = await getSentencesByIds(ids);
+        if (cancelled) return;
+        setItems(results.map(r => ({ result: r, sentence: sentenceMap[r.sentenceId] ?? null })));
+        setLoading(false);
+      })();
+      return () => { cancelled = true; };
     }, [])
   );
-
-  async function load() {
-    setLoading(true);
-    const results = await getAllResults(100);
-    const withSentences = await Promise.all(
-      results.map(async (r) => ({
-        result: r,
-        sentence: await getSentenceById(r.sentenceId),
-      }))
-    );
-    setItems(withSentences);
-    setLoading(false);
-  }
 
   function formatDate(ts: number) {
     return new Date(ts).toLocaleDateString("ko-KR", {

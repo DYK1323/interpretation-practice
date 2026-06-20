@@ -41,6 +41,7 @@ export default function SentenceDetail() {
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [savedId, setSavedId] = useState<string | null>(isNew ? null : id);
   const [recordingLang, setRecordingLang] = useState<"english" | "korean" | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -63,10 +64,21 @@ export default function SentenceDetail() {
   const autoSavedIdRef = useRef<string | null>(null);
   const enAudioRef = useRef<SentenceEntry["englishAudio"]>({ type: "tts" });
   const koAudioRef = useRef<SentenceEntry["koreanAudio"]>({ type: "tts" });
-  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  // autoSavedId ref is synced via useEffect since it's only read in async handlers
   useEffect(() => { autoSavedIdRef.current = autoSavedId; }, [autoSavedId]);
-  useEffect(() => { enAudioRef.current = enAudio; }, [enAudio]);
-  useEffect(() => { koAudioRef.current = koAudio; }, [koAudio]);
+
+  function markDirty() {
+    isDirtyRef.current = true;
+    setIsDirty(true);
+  }
+  function setEnAudioSync(v: SentenceEntry["englishAudio"]) {
+    enAudioRef.current = v;
+    setEnAudio(v);
+  }
+  function setKoAudioSync(v: SentenceEntry["koreanAudio"]) {
+    koAudioRef.current = v;
+    setKoAudio(v);
+  }
 
   useEffect(() => {
     if (!isNew && id) loadSentence(id);
@@ -130,17 +142,19 @@ export default function SentenceDetail() {
       setModelKorean(s.modelKorean ?? "");
       setModelEnglish(s.modelEnglish ?? "");
       setNotes(s.notes ?? "");
-      setEnAudio(s.englishAudio ?? { type: "tts" });
-      setKoAudio(s.koreanAudio ?? { type: "tts" });
+      setEnAudioSync(s.englishAudio ?? { type: "tts" });
+      setKoAudioSync(s.koreanAudio ?? { type: "tts" });
     }
     setLoading(false);
   }
 
   async function doSave(silent = false): Promise<boolean> {
+    if (savingRef.current) return false;
     if (!englishText.trim()) {
       Alert.alert("오류", "영어 원문을 입력해주세요.");
       return false;
     }
+    savingRef.current = true;
     setSaving(true);
     const sentenceId = savedId ?? makeNewId();
     const entry: SentenceEntry = {
@@ -175,6 +189,7 @@ export default function SentenceDetail() {
       Alert.alert("오류", `저장 실패: ${e?.message ?? String(e)}`);
       return false;
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -225,8 +240,8 @@ export default function SentenceDetail() {
   async function handleRecordingComplete(uri: string) {
     if (!recordingLang || !savedId) return;
     await updateSentenceAudio(savedId, recordingLang, uri);
-    if (recordingLang === "english") setEnAudio({ type: "file", uri });
-    else setKoAudio({ type: "file", uri });
+    if (recordingLang === "english") setEnAudioSync({ type: "file", uri });
+    else setKoAudioSync({ type: "file", uri });
     setRecordingLang(null);
     Alert.alert("저장됨", `${recordingLang === "english" ? "영어" : "한국어"} 음성이 저장됐습니다.`);
   }
@@ -258,7 +273,7 @@ export default function SentenceDetail() {
               <TouchableOpacity
                 key={c.value}
                 style={[styles.chip, category === c.value && styles.chipActive]}
-                onPress={() => { setCategory(c.value); setIsDirty(true); }}
+                onPress={() => { setCategory(c.value); markDirty(); }}
               >
                 <Text style={[styles.chipText, category === c.value && styles.chipTextActive]}>
                   {c.label}
@@ -276,7 +291,7 @@ export default function SentenceDetail() {
               <TouchableOpacity
                 key={d.value}
                 style={[styles.chip, difficulty === d.value && styles.chipActive]}
-                onPress={() => { setDifficulty(d.value); setIsDirty(true); }}
+                onPress={() => { setDifficulty(d.value); markDirty(); }}
               >
                 <Text style={[styles.chipText, difficulty === d.value && styles.chipTextActive]}>
                   {d.label}
@@ -298,7 +313,7 @@ export default function SentenceDetail() {
             placeholder="영어 문장을 입력하세요"
             placeholderTextColor="#9CA3AF"
             value={englishText}
-            onChangeText={(v) => { setEnglishText(v); setIsDirty(true); }}
+            onChangeText={(v) => { setEnglishText(v); markDirty(); }}
           />
           {englishText.trim() ? (
             <View style={styles.audioRow}>
@@ -338,7 +353,7 @@ export default function SentenceDetail() {
             placeholder="한국어 문장을 입력하세요"
             placeholderTextColor="#9CA3AF"
             value={koreanText}
-            onChangeText={(v) => { setKoreanText(v); setIsDirty(true); }}
+            onChangeText={(v) => { setKoreanText(v); markDirty(); }}
           />
           {koreanText.trim() ? (
             <View style={styles.audioRow}>
@@ -375,7 +390,7 @@ export default function SentenceDetail() {
             placeholder="영→한 Step 5에 표시될 모범 통역문"
             placeholderTextColor="#9CA3AF"
             value={modelKorean}
-            onChangeText={(v) => { setModelKorean(v); setIsDirty(true); }}
+            onChangeText={(v) => { setModelKorean(v); markDirty(); }}
           />
         </View>
 
@@ -387,7 +402,7 @@ export default function SentenceDetail() {
             placeholder="한→영 Step 5에 표시될 모범 통역문"
             placeholderTextColor="#9CA3AF"
             value={modelEnglish}
-            onChangeText={(v) => { setModelEnglish(v); setIsDirty(true); }}
+            onChangeText={(v) => { setModelEnglish(v); markDirty(); }}
           />
         </View>
 
@@ -401,7 +416,7 @@ export default function SentenceDetail() {
             placeholder="예: idiom, passive, business"
             placeholderTextColor="#9CA3AF"
             value={tags}
-            onChangeText={(v) => { setTags(v); setIsDirty(true); }}
+            onChangeText={(v) => { setTags(v); markDirty(); }}
           />
         </View>
 
@@ -414,7 +429,7 @@ export default function SentenceDetail() {
             placeholder="주의할 표현, 자주 틀리는 부분 등..."
             placeholderTextColor="#9CA3AF"
             value={notes}
-            onChangeText={(v) => { setNotes(v); setIsDirty(true); }}
+            onChangeText={(v) => { setNotes(v); markDirty(); }}
           />
         </View>
 

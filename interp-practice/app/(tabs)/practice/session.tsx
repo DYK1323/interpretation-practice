@@ -49,6 +49,8 @@ export default function SessionScreen() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [sessionSaved, setSessionSaved] = useState(false);
   const appState = useRef(AppState.currentState);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const sttPulse = useRef(new Animated.Value(1)).current;
 
@@ -137,6 +139,7 @@ export default function SessionScreen() {
     await saveResult(result);
     await scheduleReview(s.id, direction, days);
     await updateSentenceDifficulty(s.id, difficulty);
+    if (!mountedRef.current) return;
     const hasNext = advanceQueue();
     if (!hasNext) {
       const total = queue.length;
