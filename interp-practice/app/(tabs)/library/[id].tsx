@@ -110,6 +110,45 @@ export default function SentenceDetail() {
     }
   }
 
+  async function handleRecordPress(lang: "english" | "korean") {
+    if (recordingLang === lang) {
+      setRecordingLang(null);
+      return;
+    }
+    // Auto-save first if not yet saved
+    if (!savedId) {
+      if (!englishText.trim()) {
+        Alert.alert("오류", "영어 원문을 먼저 입력해주세요.");
+        return;
+      }
+      setSaving(true);
+      const sentenceId = makeNewId();
+      const entry: SentenceEntry = {
+        id: sentenceId,
+        category,
+        difficulty,
+        englishText: englishText.trim(),
+        koreanText: koreanText.trim() || undefined,
+        englishAudio: enAudio,
+        koreanAudio: koAudio,
+        modelKorean: modelKorean.trim() || undefined,
+        modelEnglish: modelEnglish.trim() || undefined,
+        tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+        notes: notes.trim() || undefined,
+      };
+      try {
+        await upsertSentence(entry);
+        setSavedId(sentenceId);
+      } catch (e: any) {
+        Alert.alert("오류", `저장 실패: ${e?.message ?? String(e)}`);
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+    setRecordingLang(lang);
+  }
+
   async function handleRecordingComplete(uri: string) {
     if (!recordingLang || !savedId) return;
     await updateSentenceAudio(savedId, recordingLang, uri);
@@ -126,8 +165,6 @@ export default function SentenceDetail() {
       </View>
     );
   }
-
-  const canRecord = !!savedId;
 
   return (
     <>
@@ -199,16 +236,14 @@ export default function SentenceDetail() {
                     : { type: "tts", text: englishText, language: "en-US" }
                 }
               />
-              {canRecord && (
-                <TouchableOpacity
-                  style={styles.recordBtn}
-                  onPress={() => setRecordingLang(recordingLang === "english" ? null : "english")}
-                >
-                  <Text style={styles.recordBtnText}>
-                    {enAudio?.type === "file" ? "🎙️ 재녹음" : "🎙️ 녹음"}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.recordBtn}
+                onPress={() => handleRecordPress("english")}
+              >
+                <Text style={styles.recordBtnText}>
+                  {enAudio?.type === "file" ? "🎙️ 재녹음" : "🎙️ 녹음"}
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : null}
           {recordingLang === "english" && (
@@ -241,16 +276,14 @@ export default function SentenceDetail() {
                     : { type: "tts", text: koreanText, language: "ko-KR" }
                 }
               />
-              {canRecord && (
-                <TouchableOpacity
-                  style={styles.recordBtn}
-                  onPress={() => setRecordingLang(recordingLang === "korean" ? null : "korean")}
-                >
-                  <Text style={styles.recordBtnText}>
-                    {koAudio?.type === "file" ? "🎙️ 재녹음" : "🎙️ 녹음"}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.recordBtn}
+                onPress={() => handleRecordPress("korean")}
+              >
+                <Text style={styles.recordBtnText}>
+                  {koAudio?.type === "file" ? "🎙️ 재녹음" : "🎙️ 녹음"}
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : null}
           {recordingLang === "korean" && (
@@ -258,9 +291,6 @@ export default function SentenceDetail() {
               <RecordButton onRecordingComplete={handleRecordingComplete} />
             </View>
           )}
-          {!canRecord && koreanText.trim() ? (
-            <Text style={styles.hint}>저장 후 음성 녹음이 가능합니다</Text>
-          ) : null}
         </View>
 
         {/* 모범 통역 */}
