@@ -67,7 +67,7 @@ npm run tauri build
 
 ### 다운로드
 
-[GitHub Releases](../../releases)에서 최신 인스톨러(`.exe`)를 다운로드할 수 있습니다.
+[GitHub Releases](../../releases)에서 최신 인스톨러(`.exe`와 '.apk')를 다운로드할 수 있습니다.
 
 **요구 사항:** Windows 10/11 (64-bit)
 
