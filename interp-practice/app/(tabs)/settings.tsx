@@ -351,19 +351,15 @@ export default function SettingsScreen() {
               <View style={styles.columnGuide}>
                 <Text style={styles.columnGuideTitle}>1행(헤더) 컬럼명</Text>
                 {([
-                  { name: "englishText",    desc: "영어 원문 (영어 언어쌍 필수)",             required: true },
-                  { name: "japaneseText",   desc: "일본어 원문 (일본어 언어쌍 필수)",         required: false },
-                  { name: "chineseText",    desc: "중국어 원문 (중국어 언어쌍 필수)",         required: false },
-                  { name: "koreanText",     desc: "한국어 원문 — 한→외 연습 활성화",          required: false },
-                  { name: "foreignLanguage",desc: "언어쌍 (en/ja/zh). 생략 시 텍스트 열로 자동 감지.", required: false },
-                  { name: "category",       desc: "분류 (news/business/conference/daily)",  required: false },
-                  { name: "difficulty",     desc: "난이도 (1·2·3)",                         required: false },
-                  { name: "modelKorean",    desc: "외→한 연습 3단계 '통역 예시(한국어)'. 비워두면 koreanText 표시.", required: false },
-                  { name: "modelEnglish",   desc: "한→영 연습 3단계 '통역 예시(영어)'. 비워두면 englishText 표시.", required: false },
-                  { name: "modelJapanese",  desc: "한→일 연습 3단계 '통역 예시(일본어)'. 비워두면 japaneseText 표시.", required: false },
-                  { name: "modelChinese",   desc: "한→중 연습 3단계 '통역 예시(중국어)'. 비워두면 chineseText 표시.", required: false },
-                  { name: "tags",           desc: "태그 (|로 구분)",                  required: false },
-                  { name: "notes",          desc: "메모",                            required: false },
+                  { name: "sourceText",      desc: "원문 — 영어·일본어·중국어 중 해당 언어 텍스트",  required: true },
+                  { name: "foreignLanguage", desc: "언어쌍 (en / ja / zh). 생략 시 en으로 처리.",   required: false },
+                  { name: "koreanText",      desc: "한국어 원문 — 한→외 연습 활성화",               required: false },
+                  { name: "modelKorean",     desc: "외→한 연습 3단계 '통역 예시(한국어)'. 비워두면 koreanText 표시.", required: false },
+                  { name: "modelSource",     desc: "한→외 연습 3단계 '통역 예시(원문 언어)'. 비워두면 sourceText 표시.", required: false },
+                  { name: "category",        desc: "분류 (news/business/conference/daily)",        required: false },
+                  { name: "difficulty",      desc: "난이도 (1·2·3)",                               required: false },
+                  { name: "tags",            desc: "태그 (|로 구분)",                               required: false },
+                  { name: "notes",           desc: "메모",                                          required: false },
                 ] as const).map(({ name, desc, required }) => (
                   <View key={name} style={styles.columnRow}>
                     <Text style={[styles.columnName, required && styles.columnNameRequired]}>{name}</Text>

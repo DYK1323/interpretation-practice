@@ -39,14 +39,12 @@ function stableId(text: string): string {
 function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
   const get = (key: string) => cols[headers.indexOf(key)]?.trim() ?? "";
 
-  const englishText = get("englishText");
-  const japaneseText = get("japaneseText") || undefined;
-  const chineseText = get("chineseText") || undefined;
+  // New format: sourceText + foreignLanguage
+  // Legacy format: englishText (treated as sourceText with foreignLanguage="en")
+  const sourceText = get("sourceText") || get("englishText");
+  if (!sourceText) return null;
 
-  if (!englishText && !japaneseText && !chineseText) return null;
-
-  const primaryText = englishText || japaneseText || chineseText || "";
-  const id = get("id") || stableId(primaryText);
+  const id = get("id") || stableId(sourceText);
 
   const tagsRaw = get("tags");
   const tags = tagsRaw
@@ -57,47 +55,43 @@ function rowToEntry(cols: string[], headers: string[]): SentenceEntry | null {
 
   const foreignLangRaw = get("foreignLanguage");
   const foreignLanguage: ForeignLanguage =
-    (["en", "ja", "zh"].includes(foreignLangRaw) ? foreignLangRaw as ForeignLanguage : null) ??
-    (japaneseText ? "ja" : chineseText ? "zh" : "en");
+    (["en", "ja", "zh"].includes(foreignLangRaw) ? foreignLangRaw as ForeignLanguage : "en");
 
   const koreanText = get("koreanText") || undefined;
   const modelKorean = get("modelKorean") || undefined;
-  const modelEnglish = get("modelEnglish") || undefined;
-  const modelJapanese = get("modelJapanese") || undefined;
-  const modelChinese = get("modelChinese") || undefined;
-  const enAudioType = get("englishAudioType") || "tts";
+  const modelSource = get("modelSource") || get("modelEnglish") || undefined;
+
+  const srcAudioType = get("sourceAudioType") || get("englishAudioType") || "tts";
+  const srcAudioUri = get("sourceAudioUri") || get("englishAudioUri") || "";
   const koAudioType = get("koreanAudioType") || "tts";
-  const jaAudioType = get("japaneseAudioType") || "tts";
-  const zhAudioType = get("chineseAudioType") || "tts";
 
   const diffRaw = parseInt(get("difficulty"), 10);
   const difficulty = ([1, 2, 3].includes(diffRaw) ? diffRaw : 1) as 1 | 2 | 3;
+
+  const srcAudio = srcAudioType === "file"
+    ? { type: "file" as const, uri: srcAudioUri }
+    : { type: "tts" as const };
+  const koAudio = koAudioType === "file"
+    ? { type: "file" as const, uri: get("koreanAudioUri") }
+    : { type: "tts" as const };
 
   return {
     id,
     category: (get("category") as Category) || "daily",
     difficulty,
     foreignLanguage,
-    englishText,
+    englishText: foreignLanguage === "en" ? sourceText : "",
     koreanText,
-    englishAudio: enAudioType === "file"
-      ? { type: "file", uri: get("englishAudioUri") }
-      : { type: "tts" },
-    koreanAudio: koAudioType === "file"
-      ? { type: "file", uri: get("koreanAudioUri") }
-      : { type: "tts" },
-    japaneseText,
-    japaneseAudio: jaAudioType === "file"
-      ? { type: "file", uri: get("japaneseAudioUri") }
-      : { type: "tts" },
-    chineseText,
-    chineseAudio: zhAudioType === "file"
-      ? { type: "file", uri: get("chineseAudioUri") }
-      : { type: "tts" },
+    englishAudio: foreignLanguage === "en" ? srcAudio : { type: "tts" },
+    koreanAudio: koAudio,
+    japaneseText: foreignLanguage === "ja" ? sourceText : undefined,
+    japaneseAudio: foreignLanguage === "ja" ? srcAudio : { type: "tts" },
+    chineseText: foreignLanguage === "zh" ? sourceText : undefined,
+    chineseAudio: foreignLanguage === "zh" ? srcAudio : { type: "tts" },
     modelKorean,
-    modelEnglish,
-    modelJapanese,
-    modelChinese,
+    modelEnglish: foreignLanguage === "en" ? modelSource : undefined,
+    modelJapanese: foreignLanguage === "ja" ? modelSource : undefined,
+    modelChinese: foreignLanguage === "zh" ? modelSource : undefined,
     tags,
     notes: get("notes") || undefined,
   };
@@ -108,16 +102,15 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
   if (lines.length < 2) return { imported: 0, failed: 0 };
 
   const headers = parseCSVLine(lines[0]);
-  if (!headers.includes("englishText") && !headers.includes("japaneseText") && !headers.includes("chineseText")) {
+  if (!headers.includes("sourceText") && !headers.includes("englishText")) {
     throw new Error(
-      `필수 컬럼이 없습니다.\n\n첫 번째 행(헤더)을 확인하세요.\n필수(하나 이상): englishText / japaneseText / chineseText\n권장: koreanText, category, difficulty`
+      `필수 컬럼이 없습니다.\n\n첫 번째 행(헤더)을 확인하세요.\n필수: sourceText (또는 구버전: englishText)\n권장: foreignLanguage, koreanText, category, difficulty`
     );
   }
   const keepDifficulty = !headers.includes("difficulty");
   const hasProgress =
-    headers.includes("enkoNextReviewDate") || headers.includes("koenNextReviewDate") ||
-    headers.includes("jakoNextReviewDate") || headers.includes("kojaNextReviewDate") ||
-    headers.includes("zhkoNextReviewDate") || headers.includes("kozhNextReviewDate");
+    headers.includes("fwdNextReviewDate") || headers.includes("bwdNextReviewDate") ||
+    headers.includes("enkoNextReviewDate") || headers.includes("koenNextReviewDate");
 
   const rows: { entry: SentenceEntry; cols: string[] }[] = [];
   let failed = 0;
@@ -189,41 +182,22 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
       );
 
       if (hasProgress) {
-        await upsertProgressFromRow(db, e.id, "en-ko", {
-          nextReviewDate: get("enkoNextReviewDate"),
-          intervalDays: get("enkoIntervalDays"),
-          reviewCount: get("enkoReviewCount"),
-          lastStudiedAt: get("enkoLastStudiedAt"),
+        const fl = e.foreignLanguage ?? "en";
+        const fwdDir = fl === "ja" ? "ja-ko" : fl === "zh" ? "zh-ko" : "en-ko";
+        const bwdDir = fl === "ja" ? "ko-ja" : fl === "zh" ? "ko-zh" : "ko-en";
+        // New format uses fwdNextReviewDate / bwdNextReviewDate
+        // Legacy format uses enkoNextReviewDate / koenNextReviewDate
+        await upsertProgressFromRow(db, e.id, fwdDir, {
+          nextReviewDate: get("fwdNextReviewDate") || get("enkoNextReviewDate"),
+          intervalDays:   get("fwdIntervalDays")   || get("enkoIntervalDays"),
+          reviewCount:    get("fwdReviewCount")     || get("enkoReviewCount"),
+          lastStudiedAt:  get("fwdLastStudiedAt")   || get("enkoLastStudiedAt"),
         });
-        await upsertProgressFromRow(db, e.id, "ko-en", {
-          nextReviewDate: get("koenNextReviewDate"),
-          intervalDays: get("koenIntervalDays"),
-          reviewCount: get("koenReviewCount"),
-          lastStudiedAt: get("koenLastStudiedAt"),
-        });
-        await upsertProgressFromRow(db, e.id, "ja-ko", {
-          nextReviewDate: get("jakoNextReviewDate"),
-          intervalDays: get("jakoIntervalDays"),
-          reviewCount: get("jakoReviewCount"),
-          lastStudiedAt: get("jakoLastStudiedAt"),
-        });
-        await upsertProgressFromRow(db, e.id, "ko-ja", {
-          nextReviewDate: get("kojaNextReviewDate"),
-          intervalDays: get("kojaIntervalDays"),
-          reviewCount: get("kojaReviewCount"),
-          lastStudiedAt: get("kojaLastStudiedAt"),
-        });
-        await upsertProgressFromRow(db, e.id, "zh-ko", {
-          nextReviewDate: get("zhkoNextReviewDate"),
-          intervalDays: get("zhkoIntervalDays"),
-          reviewCount: get("zhkoReviewCount"),
-          lastStudiedAt: get("zhkoLastStudiedAt"),
-        });
-        await upsertProgressFromRow(db, e.id, "ko-zh", {
-          nextReviewDate: get("kozhNextReviewDate"),
-          intervalDays: get("kozhIntervalDays"),
-          reviewCount: get("kozhReviewCount"),
-          lastStudiedAt: get("kozhLastStudiedAt"),
+        await upsertProgressFromRow(db, e.id, bwdDir, {
+          nextReviewDate: get("bwdNextReviewDate") || get("koenNextReviewDate"),
+          intervalDays:   get("bwdIntervalDays")   || get("koenIntervalDays"),
+          reviewCount:    get("bwdReviewCount")     || get("koenReviewCount"),
+          lastStudiedAt:  get("bwdLastStudiedAt")   || get("koenLastStudiedAt"),
         });
       }
     }
