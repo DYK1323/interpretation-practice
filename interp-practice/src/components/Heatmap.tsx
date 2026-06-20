@@ -47,8 +47,8 @@ export function Heatmap({ data, weeks = 12 }: Props) {
       const dateStr = toLocalDateString(date);
       const month = date.getMonth();
 
-      if (month !== prevMonth && d === 0) {
-        monthLabel = MONTH_NAMES[month];
+      if (month !== prevMonth) {
+        if (!monthLabel) monthLabel = MONTH_NAMES[month];
         prevMonth = month;
       }
 

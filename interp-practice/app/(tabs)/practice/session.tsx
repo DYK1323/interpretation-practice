@@ -25,8 +25,8 @@ import { saveResult } from "../../../src/db/results";
 import { scheduleReview } from "../../../src/db/progress";
 import { updateSentenceDifficulty } from "../../../src/db/sentences";
 import { getSetting } from "../../../src/db/settings";
-import type { SessionStep } from "../../../src/types";
-import { DIFFICULTY_OPTIONS } from "../../../src/types";
+import type { SessionStep } from "../../../src/types/index";
+import { DIFFICULTY_OPTIONS } from "../../../src/types/index";
 
 export default function SessionScreen() {
   const router = useRouter();
@@ -34,7 +34,6 @@ export default function SessionScreen() {
     queue, queueIndex, setStep, setInterpRecordingUri, setBackInterpRecordingUri, setBackInterpText,
     advanceQueue, reset } = useSessionStore();
 
-  // STT auto-advances to COMPARE when recognition ends
   const { transcript, isListening, startListening, stopListening } = useSTT(
     direction,
     (text) => {
@@ -119,7 +118,7 @@ export default function SessionScreen() {
 
   function handleBackComplete(uri: string) {
     setBackInterpRecordingUri(uri);
-    stopListening(); // triggers STT onEnd → setBackInterpText + advance
+    stopListening();
   }
 
   async function handleScheduleReview(days: number, difficulty: 1 | 2 | 3) {
@@ -215,10 +214,14 @@ export default function SessionScreen() {
         )}
 
         {/* Step 2: 내 통역 듣기 + 재통역 녹음(RecordButton) + STT */}
-        {step === "PLAYBACK_BACK" && interpRecordingUri && (
+        {step === "PLAYBACK_BACK" && (
           <View style={styles.stepContent}>
             <Text style={styles.stepDesc}>{stepDesc}</Text>
-            <AudioPlayer source={{ type: "file", uri: interpRecordingUri }} />
+            {interpRecordingUri ? (
+              <AudioPlayer source={{ type: "file", uri: interpRecordingUri }} />
+            ) : (
+              <Text style={styles.errorText}>녹음이 없습니다. 이전 단계로 돌아가세요.</Text>
+            )}
             <View style={styles.divider} />
             <Text style={styles.subLabel}>준비되면 재통역을 녹음하세요</Text>
             {isListening && transcript ? (
@@ -258,6 +261,15 @@ export default function SessionScreen() {
               direction={direction}
               modelInterpretation={modelInterp}
             />
+            {!backInterpText && (
+              <TextInput
+                style={styles.sttFallbackInput}
+                placeholder="STT 미인식 — 직접 입력"
+                placeholderTextColor="#9CA3AF"
+                onChangeText={setBackInterpText}
+                multiline
+              />
+            )}
             <View style={styles.notesSection}>
               <Text style={styles.notesLabel}>메모</Text>
               <TextInput
@@ -321,12 +333,25 @@ const styles = StyleSheet.create({
   sourceText: { fontSize: 18, lineHeight: 28, color: "#111827", textAlign: "center" },
   divider: { width: "100%", height: 1, backgroundColor: "#F3F4F6", marginVertical: 4 },
   subLabel: { fontSize: 13, color: "#9CA3AF" },
+  errorText: { fontSize: 14, color: "#EF4444", textAlign: "center" },
   liveTranscript: { backgroundColor: "#F0F9FF", borderRadius: 12, padding: 16, width: "100%", borderWidth: 1, borderColor: "#BAE6FD" },
   liveTranscriptText: { fontSize: 15, color: "#0369A1", lineHeight: 22 },
   compareContainer: { flex: 1, gap: 0 },
   replaySection: { flexDirection: "row", gap: 10, marginBottom: 16 },
   replayItem: { flex: 1, gap: 6 },
   replaySectionLabel: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
+  sttFallbackInput: {
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    color: "#111827",
+    minHeight: 60,
+    textAlignVertical: "top",
+    backgroundColor: "#FFFBEB",
+    marginBottom: 16,
+  },
   notesSection: { marginTop: 16 },
   notesLabel: { fontSize: 13, fontWeight: "600", color: "#6B7280", marginBottom: 8 },
   notesInput: { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, padding: 12, fontSize: 15, color: "#111827", minHeight: 80, textAlignVertical: "top" },

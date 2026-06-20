@@ -1,6 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
-import type { Direction } from "../types";
+import { View, Text, StyleSheet } from "react-native";
+import type { Direction } from "../types/index";
 
 interface Props {
   originalText: string;
@@ -20,7 +20,7 @@ export function CompareView({
   const backInterpLabel = direction === "en-ko" ? "내 재통역 (영어)" : "내 재통역 (한국어)";
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
       <View style={styles.block}>
         <Text style={styles.blockLabel}>{originalLabel}</Text>
         <Text style={styles.originalText}>{originalText}</Text>
@@ -44,21 +44,16 @@ export function CompareView({
           {backInterpText || "인식된 텍스트 없음"}
         </Text>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-    gap: 0,
+    gap: 16,
   },
   block: {
     gap: 8,
-    paddingVertical: 16,
   },
   blockLabel: {
     fontSize: 12,
@@ -88,11 +83,9 @@ const styles = StyleSheet.create({
   },
   modelBlock: {
     gap: 8,
-    paddingVertical: 16,
     backgroundColor: "#F0F9FF",
     borderRadius: 12,
-    paddingHorizontal: 16,
-    marginBottom: 8,
+    padding: 16,
   },
   modelText: {
     fontSize: 16,

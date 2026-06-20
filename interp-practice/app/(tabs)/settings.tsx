@@ -102,6 +102,8 @@ export default function SettingsScreen() {
         Alert.alert("내보낼 문장 없음", "라이브러리에 문장을 추가하세요.");
       } else if (Platform.OS === "android") {
         ToastAndroid.show(`${count}개 문장 내보내기 완료`, ToastAndroid.SHORT);
+      } else {
+        Alert.alert("내보내기 완료", `${count}개 문장을 내보냈습니다.`);
       }
     } catch (e: any) {
       Alert.alert("내보내기 실패", e?.message ?? "알 수 없는 오류");
@@ -217,7 +219,6 @@ export default function SettingsScreen() {
               onPress={() => {
                 setLimitInput(String(settings.dailyNewLimit));
                 setLimitModalVisible(true);
-                setTimeout(() => limitInputRef.current?.focus(), 100);
               }}
             >
               <Text style={[
@@ -333,6 +334,7 @@ export default function SettingsScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setLimitModalVisible(false)}
+        onShow={() => limitInputRef.current?.focus()}
       >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
