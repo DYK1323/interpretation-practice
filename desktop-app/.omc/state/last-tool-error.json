@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"ls \\\"c:\\\\Users\\\\DAYOUNG\\\\260522\\\\desktop-app\\\\src-tauri\\\\\\\" && echo \\\"---\\\" && ls \\\"c:\\\\Users\\\\DAYOUNG\\\\260522\\\\desktop-app\\\\src-tauri\\\\capabilities\\\" 2>/dev/null || echo \\\"(no capabilitie...",
+  "error": "Exit code 2\n/usr/bin/bash: eval: line 1: syntax error near unexpected token `('\n/usr/bin/bash: eval: line 1: `ls \"c:\\Users\\DAYOUNG\\260522\\desktop-app\\src-tauri\\\" && echo \"---\" && ls \"c:\\Users\\DAYOUNG\\260522\\desktop-app\\src-tauri\\capabilities\" 2>/dev/null || echo \"(no capabilities dir)\"'",
+  "timestamp": "2026-06-20T12:43:58.049Z",
+  "retry_count": 1
+}
