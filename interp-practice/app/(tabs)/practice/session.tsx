@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   AppState,
   Animated,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { StepIndicator } from "../../../src/components/StepIndicator";
 import { AudioPlayer } from "../../../src/components/AudioPlayer";
@@ -78,7 +78,6 @@ export default function SessionScreen() {
       return;
     }
     activateKeepAwakeAsync();
-    loadSettings();
     const sub = AppState.addEventListener("change", (nextState) => {
       appState.current = nextState;
     });
@@ -88,12 +87,12 @@ export default function SessionScreen() {
     };
   }, []);
 
-  async function loadSettings() {
-    const show = await getSetting("showSourceTextDuringListen");
-    setShowSourceText(show);
-    const speed = await getSetting("playbackSpeed");
-    setPlaybackSpeed(speed);
-  }
+  useFocusEffect(
+    useCallback(() => {
+      getSetting("showSourceTextDuringListen").then(setShowSourceText);
+      getSetting("playbackSpeed").then(setPlaybackSpeed);
+    }, [])
+  );
 
   if (!sentence) return null;
   const s = sentence;
