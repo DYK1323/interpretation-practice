@@ -84,6 +84,11 @@ async function importCSVContent(content: string): Promise<{ imported: number; fa
   if (lines.length < 2) return { imported: 0, failed: 0 };
 
   const headers = parseCSVLine(lines[0]);
+  if (!headers.includes("englishText")) {
+    throw new Error(
+      `필수 컬럼 'englishText'가 없습니다.\n\n첫 번째 행(헤더)을 확인하세요.\n필수: englishText\n권장: koreanText, category, difficulty`
+    );
+  }
   const keepDifficulty = !headers.includes("difficulty");
   const hasProgress =
     headers.includes("enkoNextReviewDate") || headers.includes("koenNextReviewDate");

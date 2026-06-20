@@ -309,23 +309,43 @@ export default function SettingsScreen() {
         onRequestClose={() => setSyncGuideVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>시트 공유 설정을 미리 확인해주세요</Text>
-            <View style={styles.stepList}>
-              <Text style={styles.stepItem}>① 구글 스프레드시트를 엽니다.</Text>
-              <Text style={styles.stepItem}>② 오른쪽 상단 <Text style={styles.stepEmphasis}>공유</Text> 버튼을 누릅니다.</Text>
-              <Text style={styles.stepItem}>③ <Text style={styles.stepEmphasis}>"링크 있는 모든 사용자"</Text> → <Text style={styles.stepEmphasis}>"뷰어"</Text>로 설정합니다.</Text>
-              <Text style={styles.stepItem}>④ 링크를 복사해 위 입력칸에 붙여넣습니다.</Text>
+          <ScrollView contentContainerStyle={styles.modalScrollContent} keyboardShouldPersistTaps="handled">
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>시트 공유 설정을 미리 확인해주세요</Text>
+              <View style={styles.stepList}>
+                <Text style={styles.stepItem}>① 구글 스프레드시트를 엽니다.</Text>
+                <Text style={styles.stepItem}>② 오른쪽 상단 <Text style={styles.stepEmphasis}>공유</Text> 버튼을 누릅니다.</Text>
+                <Text style={styles.stepItem}>③ <Text style={styles.stepEmphasis}>"링크 있는 모든 사용자"</Text> → <Text style={styles.stepEmphasis}>"뷰어"</Text>로 설정합니다.</Text>
+                <Text style={styles.stepItem}>④ 링크를 복사해 위 입력칸에 붙여넣습니다.</Text>
+              </View>
+              <View style={styles.columnGuide}>
+                <Text style={styles.columnGuideTitle}>1행(헤더) 컬럼명</Text>
+                <Text style={styles.columnGuideRow}>
+                  <Text style={styles.columnRequired}>필수  </Text>
+                  <Text style={styles.columnName}>englishText</Text>
+                </Text>
+                <Text style={styles.columnGuideRow}>
+                  <Text style={styles.columnOptional}>권장  </Text>
+                  <Text style={styles.columnName}>koreanText · category · difficulty</Text>
+                </Text>
+                <Text style={styles.columnGuideRow}>
+                  <Text style={styles.columnOptional}>선택  </Text>
+                  <Text style={styles.columnName}>modelKorean · modelEnglish · tags · notes</Text>
+                </Text>
+                <Text style={styles.columnGuideHint}>
+                  앱에서 내보낸 CSV를 구글 시트로 열면 헤더가 자동으로 맞춰집니다.
+                </Text>
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSyncGuideVisible(false)}>
+                  <Text style={styles.modalCancelText}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSync}>
+                  <Text style={styles.modalConfirmText}>동기화 시작</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSyncGuideVisible(false)}>
-                <Text style={styles.modalCancelText}>취소</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSync}>
-                <Text style={styles.modalConfirmText}>동기화 시작</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -507,4 +527,19 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: 14, color: "#6B7280" },
   infoValue: { fontSize: 14, color: "#374151", fontWeight: "500" },
+  modalScrollContent: { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: 24 },
+  columnGuide: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 8,
+    padding: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  columnGuideTitle: { fontSize: 12, fontWeight: "700", color: "#6B7280", marginBottom: 2 },
+  columnGuideRow: { fontSize: 12, color: "#374151", lineHeight: 18 },
+  columnRequired: { color: "#DC2626", fontWeight: "700" },
+  columnOptional: { color: "#6B7280", fontWeight: "600" },
+  columnName: { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", color: "#1A56DB" },
+  columnGuideHint: { fontSize: 11, color: "#9CA3AF", lineHeight: 16, marginTop: 4 },
 });
