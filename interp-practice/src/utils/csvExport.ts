@@ -80,7 +80,9 @@ export async function exportCSV(): Promise<number> {
 
   const csv = [HEADERS, ...rows.map(rowToCSV)].join("\n");
 
-  const file = new File(Paths.document, "sentences_export.csv");
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+  const file = new File(Paths.document, `sentences_export_${dateStr}.csv`);
   if (file.exists) file.delete();
   file.write(csv);
   if (!file.exists) throw new Error("파일 생성에 실패했습니다.");
