@@ -46,6 +46,7 @@ export default function SessionScreen() {
 
   const [notes, setNotes] = useState("");
   const [showSourceText, setShowSourceText] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [sessionSaved, setSessionSaved] = useState(false);
   const appState = useRef(AppState.currentState);
 
@@ -89,6 +90,8 @@ export default function SessionScreen() {
   async function loadSettings() {
     const show = await getSetting("showSourceTextDuringListen");
     setShowSourceText(show);
+    const speed = await getSetting("playbackSpeed");
+    setPlaybackSpeed(speed);
   }
 
   if (!sentence) return null;
@@ -200,6 +203,7 @@ export default function SessionScreen() {
                   ? { type: "file", uri: sourceAudio.uri }
                   : { type: "tts", text: sourceText, language: sourceLang }
               }
+              speed={playbackSpeed}
             />
             <View style={styles.divider} />
             <Text style={styles.subLabel}>준비되면 통역을 녹음하세요</Text>
