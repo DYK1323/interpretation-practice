@@ -232,16 +232,16 @@ export default function SessionScreen() {
             {(interpRecordingUri || backInterpRecordingUri) ? (
               <View style={styles.replaySection}>
                 {interpRecordingUri ? (
-                  <>
+                  <View style={styles.replayItem}>
                     <Text style={styles.replaySectionLabel}>통역 녹음</Text>
                     <AudioPlayer source={{ type: "file", uri: interpRecordingUri }} />
-                  </>
+                  </View>
                 ) : null}
                 {backInterpRecordingUri ? (
-                  <>
-                    <Text style={[styles.replaySectionLabel, { marginTop: 10 }]}>재통역 녹음</Text>
+                  <View style={styles.replayItem}>
+                    <Text style={styles.replaySectionLabel}>재통역 녹음</Text>
                     <AudioPlayer source={{ type: "file", uri: backInterpRecordingUri }} />
-                  </>
+                  </View>
                 ) : null}
               </View>
             ) : null}
@@ -317,8 +317,9 @@ const styles = StyleSheet.create({
   liveTranscript: { backgroundColor: "#F0F9FF", borderRadius: 12, padding: 16, width: "100%", borderWidth: 1, borderColor: "#BAE6FD" },
   liveTranscriptText: { fontSize: 15, color: "#0369A1", lineHeight: 22 },
   compareContainer: { flex: 1, gap: 0 },
-  replaySection: { marginBottom: 16 },
-  replaySectionLabel: { fontSize: 13, fontWeight: "600", color: "#6B7280", marginBottom: 8 },
+  replaySection: { flexDirection: "row", gap: 10, marginBottom: 16 },
+  replayItem: { flex: 1, gap: 6 },
+  replaySectionLabel: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
   notesSection: { marginTop: 16 },
   notesLabel: { fontSize: 13, fontWeight: "600", color: "#6B7280", marginBottom: 8 },
   notesInput: { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, padding: 12, fontSize: 15, color: "#111827", minHeight: 80, textAlignVertical: "top" },
