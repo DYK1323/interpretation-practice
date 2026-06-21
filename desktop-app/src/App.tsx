@@ -23,7 +23,7 @@ import { getNextStep, getSTTLocale } from "./core/session";
 import * as api from "./tauri/api";
 
 type Tab = "practice" | "library" | "history" | "settings";
-type QueueItem = { sentence: SentenceEntry; direction: Direction };
+type QueueItem = { sentence: SentenceEntry; direction: Direction; isRetry?: boolean };
 type SpeechRecognitionAlternative = { transcript: string };
 type SpeechRecognitionResultLike = {
   0?: SpeechRecognitionAlternative;
@@ -200,9 +200,16 @@ function App() {
   const [dbPath, setDbPath] = useState("");
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
+  const [originalQueueLength, setOriginalQueueLength] = useState(0);
   const [sessionStep, setSessionStep] = useState<SessionStep>("LISTEN_RECORD");
   const [sessionDraft, setSessionDraft] = useState({ interpUri: "", backUri: "", backText: "", notes: "" });
   const activeQueueItem = queue.length > 0 ? queue[queueIndex] : null;
+
+  function startQueue(items: QueueItem[]) {
+    setQueue(items);
+    setQueueIndex(0);
+    setOriginalQueueLength(items.length);
+  }
 
   async function refresh() {
     const loadedSettings = await api.getAllSettings();
@@ -227,7 +234,7 @@ function App() {
     setTab(nextTab);
   }
 
-  async function finishSentence(days: number, difficulty: 1 | 2 | 3) {
+  async function finishSentence(difficulty: 1 | 2 | 3) {
     const item = queue[queueIndex];
     if (!item) return;
     const originalText = sourceForDirection(item.sentence, item.direction);
@@ -242,17 +249,47 @@ function App() {
       originalText,
       notes: sessionDraft.notes.trim() || undefined,
     });
-    await api.scheduleReview(item.sentence.id, item.direction, days);
-    await api.upsertSentence({ ...item.sentence, difficulty });
 
-    if (queueIndex + 1 < queue.length) {
-      setQueueIndex((index) => index + 1);
+    const isRetry = item.isRetry ?? false;
+    const nextStep = () => {
       setSessionStep("LISTEN_RECORD");
       setSessionDraft({ interpUri: "", backUri: "", backText: "", notes: "" });
+    };
+
+    if (difficulty === 3) {
+      if (!isRetry) {
+        const progress = await api.getProgress(item.sentence.id, item.direction);
+        if (progress) {
+          await api.scheduleReview(item.sentence.id, item.direction, 1);
+        }
+      }
+      setQueue((prev) => [...prev, { ...item, isRetry: true }]);
+      setQueueIndex((idx) => idx + 1);
+      nextStep();
     } else {
-      alert(`${queue.length}문장 학습 완료 🎉`);
-      exitSession();
-      await refresh();
+      let days: number;
+      if (isRetry) {
+        days = difficulty === 2 ? 1 : 3;
+      } else {
+        const progress = await api.getProgress(item.sentence.id, item.direction);
+        if (progress) {
+          const multiplier = difficulty === 2 ? 2.5 : 3.5;
+          days = Math.max(1, Math.round(progress.intervalDays * multiplier));
+        } else {
+          days = difficulty === 2 ? 1 : 3;
+        }
+      }
+      await api.scheduleReview(item.sentence.id, item.direction, days);
+      await api.upsertSentence({ ...item.sentence, difficulty });
+
+      if (queueIndex + 1 < queue.length) {
+        setQueueIndex((idx) => idx + 1);
+        nextStep();
+      } else {
+        alert(`${originalQueueLength}문장 학습 완료 🎉`);
+        exitSession();
+        await refresh();
+      }
     }
   }
 
@@ -301,12 +338,11 @@ function App() {
             settings={settings}
             sentences={sentences}
             results={results}
-            setQueue={setQueue}
-            setQueueIndex={setQueueIndex}
+            startQueue={startQueue}
             refresh={refresh}
           />
         ) : tab === "library" ? (
-          <LibraryView settings={settings} sentences={sentences} refresh={refresh} startSingle={(item) => setQueue([item])} />
+          <LibraryView settings={settings} sentences={sentences} refresh={refresh} startSingle={(item) => startQueue([item])} />
         ) : tab === "history" ? (
           <HistoryView results={results} sentences={sentences} refresh={refresh} />
         ) : (
@@ -317,12 +353,11 @@ function App() {
   );
 }
 
-function PracticeView({ settings, sentences, results, setQueue, setQueueIndex, refresh }: {
+function PracticeView({ settings, sentences, results, startQueue, refresh }: {
   settings: UserSettings;
   sentences: SentenceEntry[];
   results: SessionResult[];
-  setQueue: (items: QueueItem[]) => void;
-  setQueueIndex: (index: number) => void;
+  startQueue: (items: QueueItem[]) => void;
   refresh: () => Promise<void>;
 }) {
   const [direction, setDirection] = useState<Direction>(FOREIGN_LANGUAGE_DIRECTIONS[settings.foreignLanguage][0]);
@@ -344,8 +379,7 @@ function PracticeView({ settings, sentences, results, setQueue, setQueueIndex, r
       alert("학습할 문장 없음\n라이브러리에 문장을 추가하거나 복습 일정이 돌아올 때까지 기다려주세요.");
       return;
     }
-    setQueue(items);
-    setQueueIndex(0);
+    startQueue(items);
     await refresh();
   }
 
@@ -437,7 +471,7 @@ function SessionView({ item, index, total, step, draft, settings, setStep, setDr
   setStep: (step: SessionStep) => void;
   setDraft: (draft: { interpUri: string; backUri: string; backText: string; notes: string }) => void;
   onExit: () => void;
-  onFinish: (days: number, difficulty: 1 | 2 | 3) => Promise<void>;
+  onFinish: (difficulty: 1 | 2 | 3) => Promise<void>;
 }) {
   const recorder = useRecorder();
   const originalText = sourceForDirection(item.sentence, item.direction);
@@ -485,7 +519,10 @@ function SessionView({ item, index, total, step, draft, settings, setStep, setDr
     <section className="screen session">
       <header className="sessionHeader">
         <div className="sessionHeaderRow">
-          <strong>{index + 1} / {total}</strong>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <strong>{index + 1} / {total}</strong>
+            {item.isRetry && <span className="retryBadge">재도전</span>}
+          </div>
           <div className="stepIndicator">
             <StepMark label="듣기/통역" number={1} active={step === "LISTEN_RECORD"} done={stepIndex > 0} />
             <i className={stepIndex > 0 ? "done" : ""} />
@@ -562,7 +599,7 @@ function SessionView({ item, index, total, step, draft, settings, setStep, setDr
             <p>이 문장 얼마나 어려웠나요?</p>
             <div className="difficultyRow">
               {DIFFICULTY_OPTIONS.map((option) => (
-                <button key={option.difficulty} onClick={() => onFinish(option.days, option.difficulty)}>
+                <button key={option.difficulty} onClick={() => onFinish(option.difficulty)}>
                   <strong>{option.label}</strong>
                   <small>{option.sublabel}</small>
                 </button>

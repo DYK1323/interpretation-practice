@@ -380,6 +380,24 @@ fn get_results(app: tauri::AppHandle, limit: i64) -> Result<Vec<SessionResult>, 
     rows
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProgressInfo {
+    interval_days: i64,
+}
+
+#[tauri::command]
+fn get_progress(app: tauri::AppHandle, sentence_id: String, direction: String) -> Result<Option<ProgressInfo>, String> {
+    let db = conn(&app)?;
+    db.query_row(
+        "SELECT interval_days FROM sentence_progress WHERE sentence_id = ? AND direction = ?",
+        params![sentence_id, direction],
+        |row| Ok(ProgressInfo { interval_days: row.get(0)? }),
+    )
+    .optional()
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn get_practice_queue(app: tauri::AppHandle, foreign_language: String, direction: String, category: Option<String>, daily_new_limit: i64) -> Result<Vec<QueueItem>, String> {
     let db = conn(&app)?;
@@ -460,6 +478,7 @@ pub fn run() {
             upsert_sentence,
             get_all_sentences,
             delete_sentence,
+            get_progress,
             schedule_review,
             save_result,
             get_results,

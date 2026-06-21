@@ -490,9 +490,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   font-size: 13px;
 }
 .dueBadge,
-.newBadge {
+.newBadge,
+.retryBadge {
   border-radius: 999px !important;
   font-weight: 800 !important;
+}
+.retryBadge {
+  color: #92400e !important;
+  background: #FEF3C7 !important;
+  border-color: #FDE68A !important;
 }
 .dueBadge {
   color: #92400e !important;
