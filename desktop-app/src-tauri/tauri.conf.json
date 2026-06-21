@@ -27,5 +27,13 @@
     "active": true,
     "targets": "nsis",
     "icon": ["icons/icon.ico"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "REPLACE_WITH_PUBLIC_KEY",
+      "endpoints": [
+        "https://github.com/DYK1323/interpretation-practice/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

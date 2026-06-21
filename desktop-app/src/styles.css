@@ -1139,6 +1139,7 @@ label.check input {
 }
 .errorText {
   margin: 0;
+  width: 100%;
   padding: 12px 14px;
   border-radius: 10px;
   background: var(--red-soft);
@@ -1149,9 +1150,11 @@ label.check input {
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
   border-radius: 10px;
-  padding: 16px 18px;
+  width: 100%;
+  padding: 20px;
   display: grid;
   gap: 6px;
+  text-align: left;
 }
 .modelLabel {
   font-size: 11px;
@@ -1372,6 +1375,41 @@ blockquote {
   color: var(--text);
   font-size: 13px;
   text-align: right;
+}
+.updateSection {
+  padding: 12px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.updateAvailable {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.updateAvailable span {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue);
+}
+.updateAvailable small {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+.updateProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.updateProgress span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.updateProgress progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--blue);
 }
 .deviceGrid {
   display: grid;
