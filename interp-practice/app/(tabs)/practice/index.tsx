@@ -234,7 +234,7 @@ export default function PracticeHome() {
 
       {/* 히트맵 */}
       <View style={styles.heatmapSection}>
-        <Text style={styles.heatmapTitle}>최근 12주</Text>
+        <Text style={styles.heatmapTitle}>학습 기록</Text>
         <Heatmap data={heatmapData} weeks={12} />
       </View>
     </ScrollView>
