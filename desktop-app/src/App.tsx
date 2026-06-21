@@ -531,6 +531,8 @@ function SessionView({ item, index, total, originalQueueLength, step, draft, set
   const passLabel = settings.splitSessionMode ? (isReviewPass ? "복습" : "통역") : null;
   const displayIndex = isReviewPass ? index - origLen : index;
   const displayTotal = settings.splitSessionMode ? origLen : total;
+  const [pendingInterpUri, setPendingInterpUri] = useState<string | null>(null);
+  useEffect(() => { setPendingInterpUri(null); }, [index]);
   const draftRef = useRef(draft);
   useEffect(() => {
     draftRef.current = draft;
@@ -553,7 +555,11 @@ function SessionView({ item, index, total, originalQueueLength, step, draft, set
     }
     const uri = await recorder.stop();
     if (kind === "interp") {
-      onInterpComplete(uri);
+      if (settings.splitSessionMode && !isReviewPass) {
+        setPendingInterpUri(uri);
+      } else {
+        onInterpComplete(uri);
+      }
     } else {
       stt.stopListening();
       setDraft({ ...draftRef.current, backUri: uri, backText: stt.transcript.trim() || draftRef.current.backText });
@@ -586,7 +592,7 @@ function SessionView({ item, index, total, originalQueueLength, step, draft, set
         </div>
       </header>
 
-      {step === "LISTEN_RECORD" && (
+      {step === "LISTEN_RECORD" && !pendingInterpUri && (
         <div className="focusCard">
           <p className="stepDesc">{stepDesc}</p>
           {settings.showSourceTextDuringListen && <blockquote>{originalText}</blockquote>}
@@ -600,6 +606,20 @@ function SessionView({ item, index, total, originalQueueLength, step, draft, set
             <span aria-hidden="true">{recorder.recording ? "■" : "●"}</span>
           </button>
           <span className="recordLabel">{recorder.recording ? "탭하여 완료" : "탭하여 녹음 시작"}</span>
+        </div>
+      )}
+
+      {step === "LISTEN_RECORD" && !!pendingInterpUri && (
+        <div className="focusCard">
+          <p className="stepDesc">모범 통역</p>
+          <blockquote>{originalText}</blockquote>
+          {modelText
+            ? <div className="modelBox"><span className="modelLabel">모범</span><p>{modelText}</p></div>
+            : <p className="errorText">모범 통역이 없습니다.</p>
+          }
+          <button className="primary" onClick={() => { onInterpComplete(pendingInterpUri!); setPendingInterpUri(null); }}>
+            다음 문장 →
+          </button>
         </div>
       )}
 
