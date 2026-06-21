@@ -207,15 +207,17 @@ export async function exportToScript(url: string): Promise<number> {
 }
 
 export async function speakText(text: string, language: string, speed: number): Promise<void> {
+  if (isTauri) {
+    await invoke("speak_text", { text, language, speed });
+    return;
+  }
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = language;
     utterance.rate = speed;
     window.speechSynthesis.speak(utterance);
-    return;
   }
-  if (isTauri) await invoke("speak_text", { text, language, speed });
 }
 
 export async function startSTT(language: string): Promise<string> {

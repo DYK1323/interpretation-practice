@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -457,8 +459,36 @@ fn chrono_like_now() -> i64 {
 }
 
 #[tauri::command]
-fn speak_text(text: String, language: String, speed: f64) -> Result<String, String> {
-    Ok(format!("TTS adapter placeholder: eSpeak NG/XTTS-v2 sidecar will speak {language} at {speed}x: {text}"))
+fn speak_text(text: String, language: String, speed: f64) -> Result<(), String> {
+    let culture = match language.as_str() {
+        s if s.starts_with("en") => "en-US",
+        s if s.starts_with("ko") => "ko-KR",
+        s if s.starts_with("ja") => "ja-JP",
+        s if s.starts_with("zh") => "zh-CN",
+        _ => "en-US",
+    };
+    // SAPI rate: -10(slow)~+10(fast), 1.0 speed → 0
+    let rate = ((speed - 1.0) * 5.0).round() as i32;
+    let rate = rate.clamp(-5, 5);
+    let safe_text = text.replace('\'', " ").replace('"', " ").replace('`', " ").replace('$', "");
+    let script = format!(
+        "Add-Type -AssemblyName System.Speech; \
+         $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; \
+         try {{ $s.SelectVoiceByHints([System.Speech.Synthesis.VoiceGender]::NotSet, \
+           [System.Speech.Synthesis.VoiceAge]::NotSet, 0, \
+           [System.Globalization.CultureInfo]::GetCultureInfo('{culture}')) }} catch {{}}; \
+         $s.Rate = {rate}; $s.Speak('{text}')",
+        culture = culture,
+        rate = rate,
+        text = safe_text,
+    );
+    std::thread::spawn(move || {
+        let _ = std::process::Command::new("powershell")
+            .args(["-WindowStyle", "Hidden", "-NonInteractive", "-Command", &script])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .spawn();
+    });
+    Ok(())
 }
 
 #[tauri::command]
