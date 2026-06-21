@@ -137,7 +137,8 @@ export default function SettingsScreen() {
         if (res.ok) {
           const data = await res.json();
           const latest = (data.tag_name as string).replace(/^v/, "");
-          if (latest !== APP_VERSION) nativeUpdateVersion = latest;
+          const hasApk = (data.assets as any[]).some((a: any) => String(a.name).endsWith(".apk"));
+          if (hasApk && latest !== APP_VERSION) nativeUpdateVersion = latest;
         }
       } catch {}
 
