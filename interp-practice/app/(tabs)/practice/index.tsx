@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { getDueWithSentences, getNewSentences, countNewStudiedToday } from "../../../src/db/progress";
+import { getDueWithSentences, getNewSentences, countNewStudiedToday, getTodaySentences } from "../../../src/db/progress";
 import { getHeatmapData, getStats } from "../../../src/db/results";
 import { getAllSettings } from "../../../src/db/settings";
 import { useSessionStore } from "../../../src/features/session/useSessionStore";
@@ -90,10 +90,30 @@ export default function PracticeHome() {
 
   function handleStart() {
     let queue = [...queueCache.retry, ...queueCache.due, ...queueCache.newItems];
-    if (queue.length === 0) {
-      Alert.alert("학습할 문장 없음", "라이브러리에 문장을 추가하거나 복습 일정이 돌아올 때까지 기다려주세요.");
+    if (practiceSettings.shuffleSentences) queue = shuffle(queue);
+    startQueue(queue);
+    router.push("/practice/session");
+  }
+
+  async function handleExtraNew() {
+    const extra = await getNewSentences(direction, selectedCategory, 10);
+    if (extra.length === 0) {
+      Alert.alert("새 문장 없음", "라이브러리에 학습할 새 문장이 없습니다.");
       return;
     }
+    let queue: QueueItem[] = extra.map((s) => ({ sentence: s, direction }));
+    if (practiceSettings.shuffleSentences) queue = shuffle(queue);
+    startQueue(queue);
+    router.push("/practice/session");
+  }
+
+  async function handleReviewToday() {
+    const today = await getTodaySentences(foreignLanguage);
+    if (today.length === 0) {
+      Alert.alert("오늘 학습한 문장 없음", "오늘 학습한 문장이 없습니다.");
+      return;
+    }
+    let queue: QueueItem[] = today.map((d) => ({ sentence: d.sentence, direction: d.direction }));
     if (practiceSettings.shuffleSentences) queue = shuffle(queue);
     startQueue(queue);
     router.push("/practice/session");
@@ -195,15 +215,21 @@ export default function PracticeHome() {
           <Text style={styles.newLimit}>새 문장은 최대 {practiceSettings.dailyNewLimit}개까지 추가됩니다</Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.startBtn, totalCount === 0 && styles.startBtnDisabled]}
-          onPress={handleStart}
-          disabled={totalCount === 0}
-        >
-          <Text style={styles.startBtnText}>
-            {totalCount === 0 ? "학습할 문장 없음" : `시작하기  ${totalCount}문장 →`}
-          </Text>
-        </TouchableOpacity>
+        {totalCount > 0 ? (
+          <TouchableOpacity style={styles.startBtn} onPress={handleStart}>
+            <Text style={styles.startBtnText}>시작하기  {totalCount}문장 →</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.doneSection}>
+            <Text style={styles.doneText}>오늘 학습을 완료했어요! 🎉</Text>
+            <TouchableOpacity style={styles.extraBtn} onPress={handleExtraNew}>
+              <Text style={styles.extraBtnText}>새 문장 더 학습하기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.extraBtn, styles.extraBtnSecondary]} onPress={handleReviewToday}>
+              <Text style={[styles.extraBtnText, styles.extraBtnTextSecondary]}>오늘 학습한 문장 다시 연습</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* 히트맵 */}
@@ -298,6 +324,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
   },
-  startBtnDisabled: { backgroundColor: "#E5E7EB" },
   startBtnText: { fontSize: 17, fontWeight: "700", color: "#FFFFFF" },
+  doneSection: { gap: 10, alignItems: "center" },
+  doneText: { fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 4 },
+  extraBtn: {
+    width: "100%",
+    backgroundColor: "#1A56DB",
+    paddingVertical: 15,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  extraBtnSecondary: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: "#1A56DB",
+  },
+  extraBtnText: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
+  extraBtnTextSecondary: { color: "#1A56DB" },
 });

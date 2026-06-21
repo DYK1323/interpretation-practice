@@ -177,7 +177,7 @@ export default function SessionScreen() {
       days = difficulty === 2 ? 1 : 3;
     } else {
       const progress = await getProgress(s.id, direction);
-      if (progress) {
+      if (progress && progress.intervalDays > 0) {
         const multiplier = difficulty === 2 ? 2.5 : 3.5;
         days = Math.max(1, Math.round(progress.intervalDays * multiplier));
       } else {

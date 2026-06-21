@@ -169,7 +169,39 @@ export async function getProgressSummaryByIds(
   return map;
 }
 
-export async function scheduleReview(
+export async function getTodaySentences(
+  foreignLanguage?: ForeignLanguage
+): Promise<Array<{ sentence: SentenceEntry; direction: Direction }>> {
+  const db = await getDB();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const params: any[] = [todayStart.getTime()];
+  let langFilter = "";
+  if (foreignLanguage) {
+    langFilter = " AND s.foreign_language = ?";
+    params.push(foreignLanguage);
+  }
+  const rows = await db.getAllAsync<any>(
+    `SELECT DISTINCT s.*, sr.direction as sr_direction
+     FROM session_results sr
+     JOIN sentences s ON s.id = sr.sentence_id
+     WHERE sr.timestamp >= ?${langFilter}
+     ORDER BY sr.timestamp DESC`,
+    params
+  );
+  const seen = new Set<string>();
+  const result: Array<{ sentence: SentenceEntry; direction: Direction }> = [];
+  for (const row of rows) {
+    const key = `${row.id}:${row.sr_direction}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push({ sentence: rowToSentence(row), direction: row.sr_direction as Direction });
+    }
+  }
+  return result;
+}
+
+
   sentenceId: string,
   direction: Direction,
   intervalDays: number
