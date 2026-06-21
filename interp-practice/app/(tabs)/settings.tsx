@@ -415,6 +415,22 @@ export default function SettingsScreen() {
           />
         </View>
 
+        <View style={styles.row}>
+          <View style={styles.rowLeft}>
+            <Text style={styles.rowTitle}>분리 세션 모드</Text>
+            <Text style={styles.rowDesc}>
+              통역을 모두 먼저 녹음한 뒤{"\n"}
+              재통역·비교를 순서대로 진행합니다.
+            </Text>
+          </View>
+          <Switch
+            value={settings.splitSessionMode}
+            onValueChange={(v) => updateSetting("splitSessionMode", v)}
+            trackColor={{ true: "#1A56DB", false: "#E5E7EB" }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+
         <View style={styles.limitSection}>
           <Text style={styles.rowTitle}>하루 새 문장 수</Text>
           <Text style={styles.rowDesc}>복습 문장 외에 추가할 새 문장의 최대 개수입니다.</Text>

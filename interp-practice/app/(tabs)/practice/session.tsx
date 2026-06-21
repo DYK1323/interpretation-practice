@@ -32,7 +32,7 @@ export default function SessionScreen() {
   const router = useRouter();
   const { sentence, direction, step, interpRecordingUri, backInterpRecordingUri, backInterpText,
     queue, queueIndex, setStep, setInterpRecordingUri, setBackInterpRecordingUri, setBackInterpText,
-    advanceQueue, requeueAndAdvance, reset } = useSessionStore();
+    advanceQueue, requeueAndAdvance, saveInterpAndAdvanceSplit, reset } = useSessionStore();
 
   const { transcript, isListening, startListening, stopListening } = useSTT(
     direction,
@@ -46,6 +46,7 @@ export default function SessionScreen() {
   const [notes, setNotes] = useState("");
   const [showSourceText, setShowSourceText] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+  const [splitSessionMode, setSplitSessionMode] = useState(false);
   const [sessionSaved, setSessionSaved] = useState(false);
   const appState = useRef(AppState.currentState);
   const mountedRef = useRef(true);
@@ -98,6 +99,7 @@ export default function SessionScreen() {
     useCallback(() => {
       getSetting("showSourceTextDuringListen").then(setShowSourceText);
       getSetting("playbackSpeed").then(setPlaybackSpeed);
+      getSetting("splitSessionMode").then(setSplitSessionMode);
     }, [])
   );
 
@@ -131,9 +133,13 @@ export default function SessionScreen() {
   if (!sourceText) return null;
 
   function handleInterpComplete(uri: string) {
-    setInterpRecordingUri(uri);
-    const next = getNextStep("LISTEN_RECORD");
-    if (next) setStep(next);
+    if (splitSessionMode && queueIndex < originalQueueLengthRef.current) {
+      saveInterpAndAdvanceSplit(uri, originalQueueLengthRef.current);
+    } else {
+      setInterpRecordingUri(uri);
+      const next = getNextStep("LISTEN_RECORD");
+      if (next) setStep(next);
+    }
   }
 
   function handleBackStart() {
@@ -220,6 +226,12 @@ export default function SessionScreen() {
 
   const stepDesc = STEP_DESCRIPTIONS[step](direction);
 
+  const origLen = originalQueueLengthRef.current || queue.length;
+  const isReviewPass = splitSessionMode && queueIndex >= origLen;
+  const passLabel = splitSessionMode ? (isReviewPass ? "복습" : "통역") : null;
+  const displayIndex = isReviewPass ? queueIndex - origLen : queueIndex;
+  const displayTotal = splitSessionMode ? origLen : queue.length;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -237,7 +249,9 @@ export default function SessionScreen() {
               </View>
             )}
             {queue.length > 1 && (
-              <Text style={styles.queueCounter}>{queueIndex + 1} / {queue.length}</Text>
+              <Text style={styles.queueCounter}>
+                {passLabel ? `${passLabel} ` : ""}{displayIndex + 1} / {displayTotal}
+              </Text>
             )}
           </View>
         </View>

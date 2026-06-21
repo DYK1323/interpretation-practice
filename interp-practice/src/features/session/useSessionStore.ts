@@ -5,6 +5,7 @@ export interface QueueItem {
   sentence: SentenceEntry;
   direction: Direction;
   isRetry?: boolean;
+  interpRecordingUri?: string;
 }
 
 interface SessionState {
@@ -24,6 +25,7 @@ interface SessionState {
   startQueue: (items: QueueItem[]) => void;
   advanceQueue: () => boolean;
   requeueAndAdvance: () => void;
+  saveInterpAndAdvanceSplit: (uri: string, originalLength: number) => void;
   setStep: (step: SessionStep) => void;
   setInterpRecordingUri: (uri: string) => void;
   setBackInterpRecordingUri: (uri: string) => void;
@@ -67,11 +69,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { queue, queueIndex } = get();
     const next = queueIndex + 1;
     if (next < queue.length) {
+      const nextItem = queue[next];
+      const hasPreRecorded = !!nextItem.interpRecordingUri;
       set({
         queueIndex: next,
-        sentence: queue[next].sentence,
-        direction: queue[next].direction,
-        ...INITIAL_STEP_STATE,
+        sentence: nextItem.sentence,
+        direction: nextItem.direction,
+        step: hasPreRecorded ? "PLAYBACK_BACK" : "LISTEN_RECORD",
+        interpRecordingUri: nextItem.interpRecordingUri ?? null,
+        backInterpRecordingUri: null,
+        backInterpText: "",
+        isPlaying: false,
+        isRecording: false,
       });
       return true;
     }
@@ -82,7 +91,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { queue, queueIndex } = get();
     const cur = queue[queueIndex];
     if (!cur) return;
-    const newQueue = [...queue, { ...cur, isRetry: true }];
+    const newQueue = [...queue, { ...cur, isRetry: true, interpRecordingUri: undefined }];
     const next = queueIndex + 1;
     set({
       queue: newQueue,
@@ -91,6 +100,38 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       direction: newQueue[next].direction,
       ...INITIAL_STEP_STATE,
     });
+  },
+
+  saveInterpAndAdvanceSplit: (uri: string, originalLength: number) => {
+    const { queue, queueIndex } = get();
+    const updatedQueue = [...queue];
+    updatedQueue[queueIndex] = { ...updatedQueue[queueIndex], interpRecordingUri: uri };
+
+    if (queueIndex < originalLength - 1) {
+      const next = queueIndex + 1;
+      set({
+        queue: updatedQueue,
+        queueIndex: next,
+        sentence: updatedQueue[next].sentence,
+        direction: updatedQueue[next].direction,
+        ...INITIAL_STEP_STATE,
+      });
+    } else {
+      const reviewItems = updatedQueue.slice(0, originalLength).map(item => ({ ...item, isRetry: false }));
+      const fullQueue = [...updatedQueue, ...reviewItems];
+      set({
+        queue: fullQueue,
+        queueIndex: originalLength,
+        sentence: reviewItems[0].sentence,
+        direction: reviewItems[0].direction,
+        step: "PLAYBACK_BACK" as SessionStep,
+        interpRecordingUri: reviewItems[0].interpRecordingUri ?? null,
+        backInterpRecordingUri: null,
+        backInterpText: "",
+        isPlaying: false,
+        isRecording: false,
+      });
+    }
   },
 
   setStep: (step) => set({ step }),

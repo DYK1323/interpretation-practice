@@ -23,7 +23,7 @@ import { getNextStep, getSTTLocale } from "./core/session";
 import * as api from "./tauri/api";
 
 type Tab = "practice" | "library" | "history" | "settings";
-type QueueItem = { sentence: SentenceEntry; direction: Direction; isRetry?: boolean; intervalDays?: number };
+type QueueItem = { sentence: SentenceEntry; direction: Direction; isRetry?: boolean; intervalDays?: number; interpUri?: string };
 type SpeechRecognitionAlternative = { transcript: string };
 type SpeechRecognitionResultLike = {
   0?: SpeechRecognitionAlternative;
@@ -229,6 +229,29 @@ function App() {
     setSessionDraft({ interpUri: "", backUri: "", backText: "", notes: "" });
   }
 
+  function handleInterpComplete(uri: string) {
+    if (settings.splitSessionMode && queueIndex < originalQueueLength) {
+      const updatedQueue = [...queue];
+      updatedQueue[queueIndex] = { ...updatedQueue[queueIndex], interpUri: uri };
+      if (queueIndex < originalQueueLength - 1) {
+        setQueue(updatedQueue);
+        setQueueIndex(queueIndex + 1);
+        setSessionStep("LISTEN_RECORD");
+        setSessionDraft({ interpUri: "", backUri: "", backText: "", notes: "" });
+      } else {
+        const reviewItems = updatedQueue.slice(0, originalQueueLength).map((item) => ({ ...item, isRetry: false }));
+        const fullQueue = [...updatedQueue, ...reviewItems];
+        setQueue(fullQueue);
+        setQueueIndex(originalQueueLength);
+        setSessionStep("PLAYBACK_BACK");
+        setSessionDraft({ interpUri: reviewItems[0].interpUri ?? "", backUri: "", backText: "", notes: "" });
+      }
+    } else {
+      setSessionDraft({ ...sessionDraft, interpUri: uri });
+      setSessionStep("PLAYBACK_BACK");
+    }
+  }
+
   function openTab(nextTab: Tab) {
     if (activeQueueItem && nextTab !== "practice") exitSession();
     setTab(nextTab);
@@ -251,18 +274,22 @@ function App() {
     });
 
     const isRetry = item.isRetry ?? false;
-    const nextStep = () => {
-      setSessionStep("LISTEN_RECORD");
-      setSessionDraft({ interpUri: "", backUri: "", backText: "", notes: "" });
-    };
+
+    function advanceToNext(newQueue: QueueItem[], nextIdx: number) {
+      const nextItem = newQueue[nextIdx];
+      setSessionStep(nextItem?.interpUri ? "PLAYBACK_BACK" : "LISTEN_RECORD");
+      setSessionDraft({ interpUri: nextItem?.interpUri ?? "", backUri: "", backText: "", notes: "" });
+    }
 
     if (difficulty === 3) {
       if (!isRetry) {
         await api.scheduleReview(item.sentence.id, item.direction, 0);
       }
-      setQueue((prev) => [...prev, { ...item, isRetry: true }]);
-      setQueueIndex((idx) => idx + 1);
-      nextStep();
+      const newQueue = [...queue, { ...item, isRetry: true, interpUri: undefined }];
+      setQueue(newQueue);
+      const nextIdx = queueIndex + 1;
+      setQueueIndex(nextIdx);
+      advanceToNext(newQueue, nextIdx);
     } else {
       let days: number;
       if (isRetry) {
@@ -279,9 +306,10 @@ function App() {
       await api.scheduleReview(item.sentence.id, item.direction, days);
       await api.upsertSentence({ ...item.sentence, difficulty });
 
-      if (queueIndex + 1 < queue.length) {
-        setQueueIndex((idx) => idx + 1);
-        nextStep();
+      const nextIdx = queueIndex + 1;
+      if (nextIdx < queue.length) {
+        setQueueIndex(nextIdx);
+        advanceToNext(queue, nextIdx);
       } else {
         exitSession();
         await refresh();
@@ -321,6 +349,7 @@ function App() {
             item={activeQueueItem}
             index={queueIndex}
             total={queue.length}
+            originalQueueLength={originalQueueLength}
             step={sessionStep}
             draft={sessionDraft}
             settings={settings}
@@ -328,6 +357,7 @@ function App() {
             setDraft={setSessionDraft}
             onExit={exitSession}
             onFinish={finishSentence}
+            onInterpComplete={handleInterpComplete}
           />
         ) : tab === "practice" ? (
           <PracticeView
@@ -477,10 +507,11 @@ function PracticeView({ settings, sentences, results, startQueue, refresh }: {
   );
 }
 
-function SessionView({ item, index, total, step, draft, settings, setStep, setDraft, onExit, onFinish }: {
+function SessionView({ item, index, total, originalQueueLength, step, draft, settings, setStep, setDraft, onExit, onFinish, onInterpComplete }: {
   item: QueueItem;
   index: number;
   total: number;
+  originalQueueLength: number;
   step: SessionStep;
   draft: { interpUri: string; backUri: string; backText: string; notes: string };
   settings: UserSettings;
@@ -488,12 +519,18 @@ function SessionView({ item, index, total, step, draft, settings, setStep, setDr
   setDraft: (draft: { interpUri: string; backUri: string; backText: string; notes: string }) => void;
   onExit: () => void;
   onFinish: (difficulty: 1 | 2 | 3) => Promise<void>;
+  onInterpComplete: (uri: string) => void;
 }) {
   const recorder = useRecorder();
   const originalText = sourceForDirection(item.sentence, item.direction);
   const modelText = modelInterpretation(item.sentence, item.direction);
   const stepIndex = (["LISTEN_RECORD", "PLAYBACK_BACK", "COMPARE"] as SessionStep[]).indexOf(step);
   const [srcLang, tgtLang] = item.direction.split("-");
+  const origLen = originalQueueLength || total;
+  const isReviewPass = settings.splitSessionMode && index >= origLen;
+  const passLabel = settings.splitSessionMode ? (isReviewPass ? "복습" : "통역") : null;
+  const displayIndex = isReviewPass ? index - origLen : index;
+  const displayTotal = settings.splitSessionMode ? origLen : total;
   const draftRef = useRef(draft);
   useEffect(() => {
     draftRef.current = draft;
@@ -516,8 +553,7 @@ function SessionView({ item, index, total, step, draft, settings, setStep, setDr
     }
     const uri = await recorder.stop();
     if (kind === "interp") {
-      setDraft({ ...draft, interpUri: uri });
-      setStep(getNextStep("LISTEN_RECORD")!);
+      onInterpComplete(uri);
     } else {
       stt.stopListening();
       setDraft({ ...draftRef.current, backUri: uri, backText: stt.transcript.trim() || draftRef.current.backText });
@@ -536,7 +572,7 @@ function SessionView({ item, index, total, step, draft, settings, setStep, setDr
       <header className="sessionHeader">
         <div className="sessionHeaderRow">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <strong>{index + 1} / {total}</strong>
+            <strong>{passLabel ? `${passLabel} ` : ""}{displayIndex + 1} / {displayTotal}</strong>
             {item.isRetry && <span className="retryBadge">재도전</span>}
           </div>
           <div className="stepIndicator">
@@ -1298,6 +1334,7 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
         <h2>연습 설정</h2>
         <label className="settingRow"><span><strong>원문 텍스트 표시</strong><small>Step 1(듣기) 화면에서 원문 텍스트를 보여줍니다. OFF가 더 어렵고 효과적인 연습입니다.</small></span><input type="checkbox" checked={settings.showSourceTextDuringListen} onChange={(e) => update("showSourceTextDuringListen", e.target.checked)} /></label>
         <label className="settingRow"><span><strong>문장 순서 섞기</strong><small>ON이면 매번 무작위 순서로 학습합니다.</small></span><input type="checkbox" checked={settings.shuffleSentences} onChange={(e) => update("shuffleSentences", e.target.checked)} /></label>
+        <label className="settingRow"><span><strong>분리 세션 모드</strong><small>통역을 모두 먼저 녹음한 뒤 재통역·비교를 순서대로 진행합니다.</small></span><input type="checkbox" checked={settings.splitSessionMode} onChange={(e) => update("splitSessionMode", e.target.checked)} /></label>
         <div>
           <strong>하루 새 문장 수</strong>
           <p>복습 문장 외에 추가할 새 문장의 최대 개수입니다.</p>
