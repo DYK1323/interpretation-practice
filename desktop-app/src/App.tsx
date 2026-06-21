@@ -1319,7 +1319,7 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
                 {lastImportAt && <span className="hint">마지막 가져오기: {formatSyncTime(lastImportAt)}</span>}
               </div>
               <div className="syncAction">
-                <button onClick={handleExport} disabled={exporting}>
+                <button className="secondary" onClick={handleExport} disabled={exporting}>
                   {exporting ? "내보내는 중…" : "앱 → 시트로 내보내기"}
                 </button>
                 {lastExportAt && <span className="hint">마지막 내보내기: {formatSyncTime(lastExportAt)}</span>}
@@ -1334,7 +1334,7 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
       <div className="group">
         <h2>데이터 내보내기</h2>
         <p>문장과 학습 진도(복습 일정·횟수)를 CSV로 내보냅니다. 구글 드라이브에 저장해두면 폰을 바꿔도 구글 시트 동기화로 복원할 수 있습니다.</p>
-        <button onClick={downloadCsv}>CSV 내보내기</button>
+        <button className="secondary" onClick={downloadCsv}>CSV 내보내기</button>
         <span className="hint">공유 창에서 구글 드라이브를 선택하세요</span>
       </div>
 
@@ -1419,7 +1419,7 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
             />
           </div>
           <div className="modalActions">
-            <button onClick={() => setSetupModalOpen(false)}>닫기</button>
+            <button className="secondary" onClick={() => setSetupModalOpen(false)}>닫기</button>
             <button className="primary" onClick={saveAndCloseModal}>저장</button>
           </div>
         </div>

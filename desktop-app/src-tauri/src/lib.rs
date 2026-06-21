@@ -59,6 +59,7 @@ struct UserSettings {
     shuffle_sentences: bool,
     daily_new_limit: i64,
     foreign_language: String,
+    split_session_mode: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -200,6 +201,7 @@ fn get_all_settings(app: tauri::AppHandle) -> Result<UserSettings, String> {
         shuffle_sentences: true,
         daily_new_limit: 10,
         foreign_language: "en".to_string(),
+        split_session_mode: false,
     };
     let mut stmt = db.prepare("SELECT key, value FROM user_settings").map_err(|e| e.to_string())?;
     let rows = stmt.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))).map_err(|e| e.to_string())?;
@@ -211,6 +213,7 @@ fn get_all_settings(app: tauri::AppHandle) -> Result<UserSettings, String> {
             "shuffleSentences" => settings.shuffle_sentences = serde_json::from_str(&value).unwrap_or(true),
             "dailyNewLimit" => settings.daily_new_limit = serde_json::from_str(&value).unwrap_or(10),
             "foreignLanguage" => settings.foreign_language = serde_json::from_str(&value).unwrap_or_else(|_| "en".to_string()),
+            "splitSessionMode" => settings.split_session_mode = serde_json::from_str(&value).unwrap_or(false),
             _ => {}
         }
     }
