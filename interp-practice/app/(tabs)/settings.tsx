@@ -14,6 +14,7 @@ import {
   Platform,
   ToastAndroid,
 } from "react-native";
+import * as Updates from "expo-updates";
 import { useRouter, useFocusEffect } from "expo-router";
 import { getAllSettings, setSetting, getStringSetting, setStringSetting } from "../../src/db/settings";
 import { syncFromSheetUrl } from "../../src/utils/csvImport";
@@ -27,6 +28,9 @@ import { FOREIGN_LANGUAGE_LABELS } from "../../src/constants";
 const SCRIPT_URL_KEY = "scriptSyncUrl";
 const LAST_IMPORT_KEY = "scriptLastImportAt";
 const LAST_EXPORT_KEY = "scriptLastExportAt";
+
+const APP_VERSION = "1.0.0";
+const GITHUB_REPO = "DYK1323/interpretation-practice";
 
 const SPEEDS = [
   { value: 0.5, label: "0.5x (매우 느리게)" },
@@ -54,6 +58,7 @@ export default function SettingsScreen() {
   const [scriptExporting, setScriptExporting] = useState(false);
   const [lastImportAt, setLastImportAt] = useState<number | null>(null);
   const [lastExportAt, setLastExportAt] = useState<number | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -100,6 +105,75 @@ export default function SettingsScreen() {
     updateSetting("dailyNewLimit", n);
     setLimitModalVisible(false);
     setLimitInput("");
+  }
+
+  function getOtaInfo(): string {
+    if (__DEV__) return "개발 환경";
+    if (Updates.isEmbeddedLaunch) return "기본 번들";
+    const id = Updates.updateId;
+    const date = Updates.createdAt;
+    if (!id) return "—";
+    const shortId = id.slice(0, 8) + "…";
+    if (!date) return shortId;
+    const m = date.getMonth() + 1;
+    const d = date.getDate();
+    const h = date.getHours().toString().padStart(2, "0");
+    const min = date.getMinutes().toString().padStart(2, "0");
+    return `${shortId} (${m}/${d} ${h}:${min})`;
+  }
+
+  async function handleCheckUpdate() {
+    setCheckingUpdate(true);
+    try {
+      let otaAvailable = false;
+      try {
+        const result = await Updates.checkForUpdateAsync();
+        otaAvailable = result.isAvailable;
+      } catch {}
+
+      let nativeUpdateVersion: string | null = null;
+      try {
+        const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+        if (res.ok) {
+          const data = await res.json();
+          const latest = (data.tag_name as string).replace(/^v/, "");
+          if (latest !== APP_VERSION) nativeUpdateVersion = latest;
+        }
+      } catch {}
+
+      if (otaAvailable) {
+        Alert.alert(
+          "업데이트 사용 가능",
+          "새 업데이트가 있습니다. 지금 적용하면 앱이 재시작됩니다.",
+          [
+            { text: "나중에", style: "cancel" },
+            {
+              text: "지금 적용",
+              onPress: async () => {
+                try {
+                  await Updates.fetchUpdateAsync();
+                  await Updates.reloadAsync();
+                } catch (e: any) {
+                  Alert.alert("업데이트 실패", e?.message ?? "알 수 없는 오류");
+                }
+              },
+            },
+          ]
+        );
+      } else if (nativeUpdateVersion) {
+        Alert.alert(
+          `새 버전 v${nativeUpdateVersion} 출시`,
+          "새 APK가 있습니다. GitHub Releases에서 다운로드하세요.",
+          [{ text: "확인" }]
+        );
+      } else {
+        const msg = "최신 버전입니다.";
+        if (Platform.OS === "android") ToastAndroid.show(msg, ToastAndroid.SHORT);
+        else Alert.alert("업데이트 확인", msg);
+      }
+    } finally {
+      setCheckingUpdate(false);
+    }
   }
 
   async function handleScriptImport() {
@@ -427,7 +501,11 @@ export default function SettingsScreen() {
         <Text style={styles.groupTitle}>정보</Text>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>버전</Text>
-          <Text style={styles.infoValue}>1.0.0</Text>
+          <Text style={styles.infoValue}>{APP_VERSION}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>OTA 업데이트</Text>
+          <Text style={styles.infoValue}>{getOtaInfo()}</Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>저장소</Text>
@@ -437,10 +515,20 @@ export default function SettingsScreen() {
           <Text style={styles.infoLabel}>오디오 엔진</Text>
           <Text style={styles.infoValue}>expo-audio + expo-speech</Text>
         </View>
-        <View style={styles.infoRow}>
+        <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
           <Text style={styles.infoLabel}>음성 인식</Text>
           <Text style={styles.infoValue}>기기 내장 (무료)</Text>
         </View>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnSecondary, checkingUpdate && styles.actionBtnDisabled]}
+          onPress={handleCheckUpdate}
+          disabled={checkingUpdate}
+        >
+          {checkingUpdate
+            ? <ActivityIndicator size="small" color="#1A56DB" />
+            : <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>업데이트 확인</Text>
+          }
+        </TouchableOpacity>
       </View>
     </ScrollView>
 
