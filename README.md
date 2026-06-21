@@ -76,9 +76,3 @@ npm run tauri build
 ## Google Sheets 동기화 설정
 
 앱 내 **설정 → 동기화** 화면에서 Apps Script URL을 입력하면 Google Sheets와 연동됩니다.
-
----
-
-## 라이선스
-
-MIT
