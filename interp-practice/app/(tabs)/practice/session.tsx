@@ -47,6 +47,7 @@ export default function SessionScreen() {
   const [showSourceText, setShowSourceText] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [splitSessionMode, setSplitSessionMode] = useState(false);
+  const [pendingInterpUri, setPendingInterpUri] = useState<string | null>(null);
   const [sessionSaved, setSessionSaved] = useState(false);
   const appState = useRef(AppState.currentState);
   const mountedRef = useRef(true);
@@ -72,6 +73,7 @@ export default function SessionScreen() {
   useEffect(() => {
     setNotes("");
     setSessionSaved(false);
+    setPendingInterpUri(null);
   }, [sentence?.id, direction, queueIndex]);
 
   useEffect(() => {
@@ -134,12 +136,19 @@ export default function SessionScreen() {
 
   function handleInterpComplete(uri: string) {
     if (splitSessionMode && queueIndex < originalQueueLengthRef.current) {
-      saveInterpAndAdvanceSplit(uri, originalQueueLengthRef.current);
+      setInterpRecordingUri(uri);
+      setPendingInterpUri(uri);
     } else {
       setInterpRecordingUri(uri);
       const next = getNextStep("LISTEN_RECORD");
       if (next) setStep(next);
     }
+  }
+
+  function handleSplitAdvance() {
+    if (!pendingInterpUri) return;
+    saveInterpAndAdvanceSplit(pendingInterpUri, originalQueueLengthRef.current);
+    setPendingInterpUri(null);
   }
 
   function handleBackStart() {
@@ -261,7 +270,7 @@ export default function SessionScreen() {
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
 
         {/* Step 1: 원문 듣기 + 통역 녹음 */}
-        {step === "LISTEN_RECORD" && (
+        {step === "LISTEN_RECORD" && !pendingInterpUri && (
           <View style={styles.stepContent}>
             <Text style={styles.stepDesc}>{stepDesc}</Text>
             {showSourceText && (
@@ -280,6 +289,27 @@ export default function SessionScreen() {
             <View style={styles.divider} />
             <Text style={styles.subLabel}>준비되면 통역을 녹음하세요</Text>
             <RecordButton onRecordingComplete={handleInterpComplete} />
+          </View>
+        )}
+
+        {/* Split pass 1 — 녹음 후 모범 통역 확인 */}
+        {step === "LISTEN_RECORD" && !!pendingInterpUri && (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepDesc}>모범 통역</Text>
+            <View style={styles.textBox}>
+              <Text style={styles.sourceText}>{sourceText}</Text>
+            </View>
+            {modelInterp ? (
+              <View style={[styles.textBox, styles.modelBox]}>
+                <Text style={styles.modelLabel}>모범</Text>
+                <Text style={styles.modelText}>{modelInterp}</Text>
+              </View>
+            ) : (
+              <Text style={styles.errorText}>모범 통역이 없습니다.</Text>
+            )}
+            <TouchableOpacity style={styles.nextSentenceBtn} onPress={handleSplitAdvance}>
+              <Text style={styles.nextSentenceBtnText}>다음 문장 →</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -403,6 +433,11 @@ const styles = StyleSheet.create({
   stepContent: { flex: 1, alignItems: "center", gap: 20, paddingTop: 24 },
   stepDesc: { fontSize: 20, fontWeight: "600", color: "#111827", textAlign: "center" },
   textBox: { backgroundColor: "#F9FAFB", borderRadius: 12, padding: 20, width: "100%", borderWidth: 1, borderColor: "#E5E7EB" },
+  modelBox: { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" },
+  modelLabel: { fontSize: 11, fontWeight: "700", color: "#16A34A", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
+  modelText: { fontSize: 17, lineHeight: 26, color: "#111827" },
+  nextSentenceBtn: { marginTop: 8, backgroundColor: "#1A56DB", paddingVertical: 16, paddingHorizontal: 40, borderRadius: 14, alignItems: "center", width: "100%" },
+  nextSentenceBtnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
   sourceText: { fontSize: 18, lineHeight: 28, color: "#111827", textAlign: "center" },
   divider: { width: "100%", height: 1, backgroundColor: "#F3F4F6", marginVertical: 4 },
   subLabel: { fontSize: 13, color: "#9CA3AF" },
