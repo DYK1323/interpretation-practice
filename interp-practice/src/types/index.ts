@@ -57,6 +57,7 @@ export interface UserSettings {
   shuffleSentences: boolean;
   dailyNewLimit: number;
   foreignLanguage: ForeignLanguage;
+  splitSessionMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -65,6 +66,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   shuffleSentences: true,
   dailyNewLimit: 10,
   foreignLanguage: "en",
+  splitSessionMode: false,
 };
 
 export type SessionStep =
