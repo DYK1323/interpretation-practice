@@ -201,7 +201,7 @@ export async function getTodaySentences(
   return result;
 }
 
-
+export async function scheduleReview(
   sentenceId: string,
   direction: Direction,
   intervalDays: number
