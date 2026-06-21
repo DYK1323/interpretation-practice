@@ -32,7 +32,7 @@ export default function SessionScreen() {
   const router = useRouter();
   const { sentence, direction, step, interpRecordingUri, backInterpRecordingUri, backInterpText,
     queue, queueIndex, setStep, setInterpRecordingUri, setBackInterpRecordingUri, setBackInterpText,
-    advanceQueue, requeueCurrent, reset } = useSessionStore();
+    advanceQueue, requeueAndAdvance, reset } = useSessionStore();
 
   const { transcript, isListening, startListening, stopListening } = useSTT(
     direction,
@@ -167,23 +167,25 @@ export default function SessionScreen() {
       if (!isRetry) {
         await scheduleReview(s.id, direction, 0);
       }
-      requeueCurrent();
-    } else {
-      let days: number;
-      if (isRetry) {
-        days = difficulty === 2 ? 1 : 3;
-      } else {
-        const progress = await getProgress(s.id, direction);
-        if (progress) {
-          const multiplier = difficulty === 2 ? 2.5 : 3.5;
-          days = Math.max(1, Math.round(progress.intervalDays * multiplier));
-        } else {
-          days = difficulty === 2 ? 1 : 3;
-        }
-      }
-      await scheduleReview(s.id, direction, days);
-      await updateSentenceDifficulty(s.id, difficulty);
+      if (!mountedRef.current) return;
+      requeueAndAdvance();
+      return;
     }
+
+    let days: number;
+    if (isRetry) {
+      days = difficulty === 2 ? 1 : 3;
+    } else {
+      const progress = await getProgress(s.id, direction);
+      if (progress) {
+        const multiplier = difficulty === 2 ? 2.5 : 3.5;
+        days = Math.max(1, Math.round(progress.intervalDays * multiplier));
+      } else {
+        days = difficulty === 2 ? 1 : 3;
+      }
+    }
+    await scheduleReview(s.id, direction, days);
+    await updateSentenceDifficulty(s.id, difficulty);
 
     if (!mountedRef.current) return;
     const hasNext = advanceQueue();
