@@ -23,7 +23,7 @@ interface SessionState {
   startSession: (sentence: SentenceEntry, direction: Direction) => void;
   startQueue: (items: QueueItem[]) => void;
   advanceQueue: () => boolean;
-  requeueCurrent: () => void;
+  requeueAndAdvance: () => void;
   setStep: (step: SessionStep) => void;
   setInterpRecordingUri: (uri: string) => void;
   setBackInterpRecordingUri: (uri: string) => void;
@@ -78,11 +78,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return false;
   },
 
-  requeueCurrent: () => {
+  requeueAndAdvance: () => {
     const { queue, queueIndex } = get();
     const cur = queue[queueIndex];
     if (!cur) return;
-    set({ queue: [...queue, { ...cur, isRetry: true }] });
+    const newQueue = [...queue, { ...cur, isRetry: true }];
+    const next = queueIndex + 1;
+    set({
+      queue: newQueue,
+      queueIndex: next,
+      sentence: newQueue[next].sentence,
+      direction: newQueue[next].direction,
+      ...INITIAL_STEP_STATE,
+    });
   },
 
   setStep: (step) => set({ step }),
