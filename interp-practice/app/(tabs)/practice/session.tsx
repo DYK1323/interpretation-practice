@@ -165,10 +165,7 @@ export default function SessionScreen() {
 
     if (difficulty === 3) {
       if (!isRetry) {
-        const progress = await getProgress(s.id, direction);
-        if (progress) {
-          await scheduleReview(s.id, direction, 1);
-        }
+        await scheduleReview(s.id, direction, 1);
       }
       requeueCurrent();
     } else {
