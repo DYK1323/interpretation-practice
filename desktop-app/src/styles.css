@@ -491,15 +491,41 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 }
 .dueBadge,
 .newBadge,
-.retryBadge {
+.retryBadge,
+.retryBadgeMain {
   border-radius: 999px !important;
   font-weight: 800 !important;
 }
-.retryBadge {
+.retryBadge,
+.retryBadgeMain {
   color: #92400e !important;
   background: #FEF3C7 !important;
   border-color: #FDE68A !important;
 }
+.doneSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.doneText {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
+  text-align: center;
+}
+.startBtnSecondary {
+  width: 100%;
+  min-height: 54px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--blue);
+  border: 1.5px solid var(--blue);
+  font-size: 17px;
+  font-weight: 800;
+}
+.startBtnSecondary:hover { background: #EBF2FF; }
 .dueBadge {
   color: #92400e !important;
   background: var(--amber-soft) !important;
