@@ -142,6 +142,13 @@ export async function getPracticeQueue(
   return [...due, ...fresh];
 }
 
+export async function getProgress(sentenceId: string, direction: Direction): Promise<{ intervalDays: number } | null> {
+  if (isTauri) return invoke("get_progress", { sentenceId, direction });
+  const key = `${sentenceId}:${direction}`;
+  const prog = memory.progress.get(key);
+  return prog ? { intervalDays: prog.intervalDays } : null;
+}
+
 export async function scheduleReview(sentenceId: string, direction: Direction, intervalDays: number): Promise<void> {
   const now = Date.now();
   if (isTauri) return invoke("schedule_review", { sentenceId, direction, intervalDays, now });

@@ -22,7 +22,7 @@ import { useSessionStore } from "../../../src/features/session/useSessionStore";
 import { useSTT } from "../../../src/features/session/useSTT";
 import { getNextStep, STEP_DESCRIPTIONS } from "../../../src/features/session/sessionMachine";
 import { saveResult } from "../../../src/db/results";
-import { scheduleReview } from "../../../src/db/progress";
+import { scheduleReview, getProgress } from "../../../src/db/progress";
 import { updateSentenceDifficulty } from "../../../src/db/sentences";
 import { getSetting } from "../../../src/db/settings";
 import type { SessionStep } from "../../../src/types/index";
@@ -32,7 +32,7 @@ export default function SessionScreen() {
   const router = useRouter();
   const { sentence, direction, step, interpRecordingUri, backInterpRecordingUri, backInterpText,
     queue, queueIndex, setStep, setInterpRecordingUri, setBackInterpRecordingUri, setBackInterpText,
-    advanceQueue, reset } = useSessionStore();
+    advanceQueue, requeueCurrent, reset } = useSessionStore();
 
   const { transcript, isListening, startListening, stopListening } = useSTT(
     direction,
@@ -49,6 +49,7 @@ export default function SessionScreen() {
   const [sessionSaved, setSessionSaved] = useState(false);
   const appState = useRef(AppState.currentState);
   const mountedRef = useRef(true);
+  const originalQueueLengthRef = useRef(0);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const sttPulse = useRef(new Animated.Value(1)).current;
@@ -70,7 +71,13 @@ export default function SessionScreen() {
   useEffect(() => {
     setNotes("");
     setSessionSaved(false);
-  }, [sentence?.id, direction]);
+  }, [sentence?.id, direction, queueIndex]);
+
+  useEffect(() => {
+    if (queue.length > 0 && !queue[0].isRetry) {
+      originalQueueLengthRef.current = queue.length;
+    }
+  }, [queue[0]?.sentence.id]);
 
   useEffect(() => {
     if (!sentence) {
@@ -138,10 +145,11 @@ export default function SessionScreen() {
     stopListening();
   }
 
-  async function handleScheduleReview(days: number, difficulty: 1 | 2 | 3) {
+  async function handleScheduleReview(difficulty: 1 | 2 | 3) {
     if (sessionSaved) return;
     setSessionSaved(true);
-    const result = {
+
+    await saveResult({
       id: `${s.id}_${direction}_${Date.now()}`,
       sentenceId: s.id,
       direction,
@@ -151,14 +159,39 @@ export default function SessionScreen() {
       backInterpText,
       originalText: sourceText,
       notes: notes.trim() || undefined,
-    };
-    await saveResult(result);
-    await scheduleReview(s.id, direction, days);
-    await updateSentenceDifficulty(s.id, difficulty);
+    });
+
+    const isRetry = queue[queueIndex]?.isRetry ?? false;
+
+    if (difficulty === 3) {
+      if (!isRetry) {
+        const progress = await getProgress(s.id, direction);
+        if (progress) {
+          await scheduleReview(s.id, direction, 1);
+        }
+      }
+      requeueCurrent();
+    } else {
+      let days: number;
+      if (isRetry) {
+        days = difficulty === 2 ? 1 : 3;
+      } else {
+        const progress = await getProgress(s.id, direction);
+        if (progress) {
+          const multiplier = difficulty === 2 ? 2.5 : 3.5;
+          days = Math.max(1, Math.round(progress.intervalDays * multiplier));
+        } else {
+          days = difficulty === 2 ? 1 : 3;
+        }
+      }
+      await scheduleReview(s.id, direction, days);
+      await updateSentenceDifficulty(s.id, difficulty);
+    }
+
     if (!mountedRef.current) return;
     const hasNext = advanceQueue();
     if (!hasNext) {
-      const total = queue.length;
+      const total = originalQueueLengthRef.current || queue.length;
       reset();
       Alert.alert("완료!", `${total}문장 학습 완료 🎉`, [
         { text: "확인", onPress: () => router.replace("/practice") },
@@ -198,9 +231,16 @@ export default function SessionScreen() {
           <TouchableOpacity onPress={handleExit} style={styles.exitBtn}>
             <Text style={styles.exitText}>나가기</Text>
           </TouchableOpacity>
-          {queue.length > 1 && (
-            <Text style={styles.queueCounter}>{queueIndex + 1} / {queue.length}</Text>
-          )}
+          <View style={styles.gnbRight}>
+            {queue[queueIndex]?.isRetry && (
+              <View style={styles.retryBadge}>
+                <Text style={styles.retryBadgeText}>재도전</Text>
+              </View>
+            )}
+            {queue.length > 1 && (
+              <Text style={styles.queueCounter}>{queueIndex + 1} / {queue.length}</Text>
+            )}
+          </View>
         </View>
         <StepIndicator currentStep={step} />
       </View>
@@ -301,7 +341,7 @@ export default function SessionScreen() {
             <View style={styles.reviewSection}>
               <Text style={styles.reviewLabel}>이 문장 얼마나 어려웠나요?</Text>
               <View style={styles.difficultyRow}>
-                {DIFFICULTY_OPTIONS.map(({ difficulty, label, days, sublabel }) => (
+                {DIFFICULTY_OPTIONS.map(({ difficulty, label, sublabel }) => (
                   <TouchableOpacity
                     key={difficulty}
                     style={[
@@ -310,7 +350,7 @@ export default function SessionScreen() {
                       difficulty === 2 && styles.diffMed,
                       difficulty === 1 && styles.diffEasy,
                     ]}
-                    onPress={() => handleScheduleReview(days, difficulty)}
+                    onPress={() => handleScheduleReview(difficulty)}
                     disabled={sessionSaved}
                   >
                     <Text style={styles.difficultyStars}>{label}</Text>
@@ -341,7 +381,10 @@ const styles = StyleSheet.create({
   },
   exitBtn: { padding: 4 },
   exitText: { fontSize: 15, fontWeight: "500", color: "#6B7280" },
+  gnbRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   queueCounter: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
+  retryBadge: { backgroundColor: "#FEF3C7", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  retryBadgeText: { fontSize: 11, color: "#D97706", fontWeight: "700" },
   body: { flex: 1 },
   bodyContent: { flexGrow: 1, padding: 24 },
   stepContent: { flex: 1, alignItems: "center", gap: 20, paddingTop: 24 },

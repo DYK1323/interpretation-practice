@@ -110,9 +110,9 @@ export const FOREIGN_LANGUAGE_DIRECTIONS: Record<ForeignLanguage, [Direction, Di
 };
 
 export const DIFFICULTY_OPTIONS = [
-  { difficulty: 3 as const, label: "어려움", days: 1, sublabel: "내일 복습" },
-  { difficulty: 2 as const, label: "보통", days: 3, sublabel: "3일 뒤" },
-  { difficulty: 1 as const, label: "쉬움", days: 7, sublabel: "1주 뒤" },
+  { difficulty: 3 as const, label: "어려움", sublabel: "재도전" },
+  { difficulty: 2 as const, label: "보통",   sublabel: "내일" },
+  { difficulty: 1 as const, label: "쉬움",   sublabel: "3일 후" },
 ];
 
 export function sourceTextOf(sentence: SentenceEntry): string {

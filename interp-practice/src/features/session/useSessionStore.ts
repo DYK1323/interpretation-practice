@@ -4,6 +4,7 @@ import type { SentenceEntry, Direction, SessionStep } from "../../types";
 export interface QueueItem {
   sentence: SentenceEntry;
   direction: Direction;
+  isRetry?: boolean;
 }
 
 interface SessionState {
@@ -22,6 +23,7 @@ interface SessionState {
   startSession: (sentence: SentenceEntry, direction: Direction) => void;
   startQueue: (items: QueueItem[]) => void;
   advanceQueue: () => boolean;
+  requeueCurrent: () => void;
   setStep: (step: SessionStep) => void;
   setInterpRecordingUri: (uri: string) => void;
   setBackInterpRecordingUri: (uri: string) => void;
@@ -74,6 +76,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return true;
     }
     return false;
+  },
+
+  requeueCurrent: () => {
+    const { queue, queueIndex } = get();
+    const cur = queue[queueIndex];
+    if (!cur) return;
+    set({ queue: [...queue, { ...cur, isRetry: true }] });
   },
 
   setStep: (step) => set({ step }),
