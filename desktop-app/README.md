@@ -12,11 +12,22 @@ npm run dev
 
 브라우저 미리보기: `http://127.0.0.1:1420`
 
-Tauri 패키징은 Rust/Cargo 설치 후 가능합니다.
+### Tauri 빌드 (선행 조건)
+
+**Windows**
+1. [rustup.rs](https://rustup.rs) 에서 Rust 설치 → 터미널 재시작
+2. [Visual Studio 2022 Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) 설치 → "C++를 사용한 데스크톱 개발" 체크
+3. Windows 10이면 [WebView2 런타임](https://developer.microsoft.com/microsoft-edge/webview2/) 설치 (Windows 11은 기본 내장)
+
+**macOS**
+```bash
+xcode-select --install   # Xcode 커맨드라인 도구
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
 
 ```powershell
-npm run tauri dev
-npm run tauri build
+npm run tauri dev    # 개발 서버 (핫리로드)
+npm run tauri build  # 배포용 빌드 → src-tauri/target/release/bundle/
 ```
 
 ## 구현된 기능
