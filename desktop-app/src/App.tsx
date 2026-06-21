@@ -1725,7 +1725,7 @@ function useLiveSTT(language: string, onEnd?: (text: string) => void) {
     }
   }
 
-  function startListening() {
+  async function startListening() {
     cleanupRecognition();
     accumulatedRef.current = "";
     currentFinalRef.current = "";
@@ -1733,6 +1733,15 @@ function useLiveSTT(language: string, onEnd?: (text: string) => void) {
     activeRef.current = true;
     stoppingRef.current = false;
     setTranscript("");
+    setStatus("마이크 권한 확인 중...");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      setStatus("마이크 접근이 거부되었습니다. Windows 설정 → 개인 정보 보호 → 마이크에서 이 앱을 허용해주세요.");
+      activeRef.current = false;
+      return;
+    }
     startEngine();
   }
 
