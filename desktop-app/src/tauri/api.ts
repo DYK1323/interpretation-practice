@@ -15,6 +15,7 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 interface QueueItem {
   sentence: SentenceEntry;
   direction: Direction;
+  intervalDays?: number;
 }
 
 const memory = {
@@ -204,6 +205,40 @@ export async function exportToScript(url: string): Promise<number> {
   });
   if (!response.ok) throw new Error(`내보내기 실패 (HTTP ${response.status})`);
   return sentences.length;
+}
+
+export async function getTodaySentences(foreignLanguage: ForeignLanguage): Promise<QueueItem[]> {
+  if (isTauri) return invoke("get_today_sentences", { foreignLanguage });
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const seen = new Set<string>();
+  return memory.results
+    .filter((r) => r.timestamp >= today.getTime())
+    .flatMap((r) => {
+      const sentence = memory.sentences.get(r.sentenceId);
+      if (!sentence || sentence.foreignLanguage !== foreignLanguage) return [];
+      const key = `${r.sentenceId}:${r.direction}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [{ sentence, direction: r.direction as Direction }];
+    });
+}
+
+export async function getNewSentences(
+  foreignLanguage: ForeignLanguage,
+  direction: Direction,
+  category: Category | null,
+  limit: number,
+): Promise<QueueItem[]> {
+  if (isTauri) return invoke("get_new_sentences", { foreignLanguage, direction, category, limit });
+  return [...memory.sentences.values()]
+    .filter((s) => s.foreignLanguage === foreignLanguage)
+    .filter((s) => !category || s.category === category)
+    .filter((s) => !memory.progress.has(`${s.id}:${direction}`))
+    .filter((s) => !direction.startsWith("ko-") || Boolean(s.koreanText))
+    .sort((a, b) => a.difficulty - b.difficulty || a.id.localeCompare(b.id))
+    .slice(0, limit)
+    .map((s) => ({ sentence: s, direction }));
 }
 
 export async function speakText(text: string, language: string, speed: number): Promise<void> {

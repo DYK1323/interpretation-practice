@@ -66,6 +66,7 @@ struct UserSettings {
 struct QueueItem {
     sentence: SentenceEntry,
     direction: String,
+    interval_days: Option<i64>,
 }
 
 fn db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -408,7 +409,7 @@ fn get_practice_queue(app: tauri::AppHandle, foreign_language: String, direction
     {
         let mut stmt = db.prepare(
             r#"
-            SELECT s.*, sp.direction as sp_direction
+            SELECT s.*, sp.direction as sp_direction, sp.interval_days as sp_interval_days
             FROM sentence_progress sp
             JOIN sentences s ON s.id = sp.sentence_id
             WHERE sp.next_review_date <= ? AND s.is_draft = 0 AND s.foreign_language = ?
@@ -416,7 +417,11 @@ fn get_practice_queue(app: tauri::AppHandle, foreign_language: String, direction
             "#,
         ).map_err(|e| e.to_string())?;
         let due = stmt.query_map(params![now, foreign_language], |row| {
-            Ok(QueueItem { sentence: row_to_sentence(row)?, direction: row.get("sp_direction")? })
+            Ok(QueueItem {
+                sentence: row_to_sentence(row)?,
+                direction: row.get("sp_direction")?,
+                interval_days: Some(row.get("sp_interval_days")?),
+            })
         }).map_err(|e| e.to_string())?;
         for item in due {
             queue.push(item.map_err(|e| e.to_string())?);
@@ -446,9 +451,58 @@ fn get_practice_queue(app: tauri::AppHandle, foreign_language: String, direction
         } else {
             stmt.query_map(params![direction, foreign_language, remaining], row_to_sentence).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>()
         }.map_err(|e| e.to_string())?;
-        queue.extend(rows.into_iter().map(|sentence| QueueItem { sentence, direction: direction.clone() }));
+        queue.extend(rows.into_iter().map(|sentence| QueueItem { sentence, direction: direction.clone(), interval_days: None }));
     }
     Ok(queue)
+}
+
+#[tauri::command]
+fn get_today_sentences(app: tauri::AppHandle, foreign_language: String) -> Result<Vec<QueueItem>, String> {
+    let db = conn(&app)?;
+    let now = chrono_like_now();
+    let today_start = now - (now % 86_400_000);
+    let mut stmt = db.prepare(
+        r#"SELECT DISTINCT s.*, sr.direction as sr_direction
+           FROM session_results sr
+           JOIN sentences s ON s.id = sr.sentence_id
+           WHERE sr.timestamp >= ? AND s.foreign_language = ?
+           ORDER BY sr.timestamp DESC"#,
+    ).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(params![today_start, foreign_language], |row| {
+        Ok((row_to_sentence(row)?, row.get::<_, String>("sr_direction")?))
+    }).map_err(|e| e.to_string())?;
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    for item in rows {
+        let (sentence, direction) = item.map_err(|e| e.to_string())?;
+        let key = format!("{}:{}", sentence.id, direction);
+        if seen.insert(key) {
+            result.push(QueueItem { sentence, direction, interval_days: None });
+        }
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+fn get_new_sentences(app: tauri::AppHandle, foreign_language: String, direction: String, category: Option<String>, limit: i64) -> Result<Vec<QueueItem>, String> {
+    let db = conn(&app)?;
+    let mut sql = String::from(
+        "SELECT s.* FROM sentences s LEFT JOIN sentence_progress sp ON s.id = sp.sentence_id AND sp.direction = ? WHERE sp.sentence_id IS NULL AND s.is_draft = 0 AND s.foreign_language = ?"
+    );
+    if category.is_some() {
+        sql.push_str(" AND s.category = ?");
+    }
+    if direction.starts_with("ko-") {
+        sql.push_str(" AND s.korean_text IS NOT NULL");
+    }
+    sql.push_str(" ORDER BY s.difficulty ASC, s.id ASC LIMIT ?");
+    let mut stmt = db.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = if let Some(cat) = category {
+        stmt.query_map(params![direction, foreign_language, cat, limit], row_to_sentence).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>()
+    } else {
+        stmt.query_map(params![direction, foreign_language, limit], row_to_sentence).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>()
+    }.map_err(|e| e.to_string())?;
+    Ok(rows.into_iter().map(|sentence| QueueItem { sentence, direction: direction.clone(), interval_days: None }).collect())
 }
 
 fn chrono_like_now() -> i64 {
@@ -513,6 +567,8 @@ pub fn run() {
             save_result,
             get_results,
             get_practice_queue,
+            get_today_sentences,
+            get_new_sentences,
             speak_text,
             start_stt
         ])

@@ -23,7 +23,7 @@ import { getNextStep, getSTTLocale } from "./core/session";
 import * as api from "./tauri/api";
 
 type Tab = "practice" | "library" | "history" | "settings";
-type QueueItem = { sentence: SentenceEntry; direction: Direction; isRetry?: boolean };
+type QueueItem = { sentence: SentenceEntry; direction: Direction; isRetry?: boolean; intervalDays?: number };
 type SpeechRecognitionAlternative = { transcript: string };
 type SpeechRecognitionResultLike = {
   0?: SpeechRecognitionAlternative;
@@ -258,10 +258,7 @@ function App() {
 
     if (difficulty === 3) {
       if (!isRetry) {
-        const progress = await api.getProgress(item.sentence.id, item.direction);
-        if (progress) {
-          await api.scheduleReview(item.sentence.id, item.direction, 1);
-        }
+        await api.scheduleReview(item.sentence.id, item.direction, 0);
       }
       setQueue((prev) => [...prev, { ...item, isRetry: true }]);
       setQueueIndex((idx) => idx + 1);
@@ -272,7 +269,7 @@ function App() {
         days = difficulty === 2 ? 1 : 3;
       } else {
         const progress = await api.getProgress(item.sentence.id, item.direction);
-        if (progress) {
+        if (progress && progress.intervalDays > 0) {
           const multiplier = difficulty === 2 ? 2.5 : 3.5;
           days = Math.max(1, Math.round(progress.intervalDays * multiplier));
         } else {
@@ -286,7 +283,6 @@ function App() {
         setQueueIndex((idx) => idx + 1);
         nextStep();
       } else {
-        alert(`${originalQueueLength}문장 학습 완료 🎉`);
         exitSession();
         await refresh();
       }
@@ -375,19 +371,30 @@ function PracticeView({ settings, sentences, results, startQueue, refresh }: {
 
   async function start() {
     const items = settings.shuffleSentences ? shuffle(queuePreview) : queuePreview;
-    if (items.length === 0) {
-      alert("학습할 문장 없음\n라이브러리에 문장을 추가하거나 복습 일정이 돌아올 때까지 기다려주세요.");
-      return;
-    }
     startQueue(items);
+    await refresh();
+  }
+
+  async function handleExtraNew() {
+    const items = await api.getNewSentences(settings.foreignLanguage, direction, selectedCategory, 10);
+    if (items.length === 0) { alert("새로 학습할 문장이 없습니다."); return; }
+    startQueue(settings.shuffleSentences ? shuffle(items) : items);
+    await refresh();
+  }
+
+  async function handleReviewToday() {
+    const items = await api.getTodaySentences(settings.foreignLanguage);
+    if (items.length === 0) { alert("오늘 학습한 문장이 없습니다."); return; }
+    startQueue(settings.shuffleSentences ? shuffle(items) : items);
     await refresh();
   }
 
   const today = new Date().toDateString();
   const todayCount = results.filter((result) => new Date(result.timestamp).toDateString() === today).length;
   const totalSentences = new Set(results.map((result) => result.sentenceId)).size;
-  const dueCount = queuePreview.filter((item) => item.direction !== direction).length;
-  const newCount = Math.max(0, queuePreview.length - dueCount);
+  const retryCount = queuePreview.filter((item) => item.intervalDays === 0).length;
+  const dueCount = queuePreview.filter((item) => item.intervalDays !== undefined && item.intervalDays > 0).length;
+  const newCount = queuePreview.filter((item) => item.intervalDays === undefined).length;
   const heatmapData = useMemo(() => {
     const data: Record<string, number> = {};
     results.forEach((result) => {
@@ -411,6 +418,7 @@ function PracticeView({ settings, sentences, results, startQueue, refresh }: {
         <div className="queueTitleRow">
           <h1>오늘의 학습</h1>
           <div className="badges">
+            {retryCount > 0 && <span className="retryBadgeMain">재도전 {retryCount}</span>}
             {dueCount > 0 && <span className="dueBadge">복습 {dueCount}</span>}
             {newCount > 0 && <span className="newBadge">새 문장 {newCount}</span>}
           </div>
@@ -441,9 +449,17 @@ function PracticeView({ settings, sentences, results, startQueue, refresh }: {
           <p className="newLimit">새 문장은 최대 {settings.dailyNewLimit}개까지 추가됩니다</p>
         </div>
 
-        <button className="startBtn" onClick={start} disabled={queuePreview.length === 0}>
-          {queuePreview.length === 0 ? "학습할 문장 없음" : `시작하기  ${queuePreview.length}문장`}
-        </button>
+        {queuePreview.length > 0 ? (
+          <button className="startBtn" onClick={start}>
+            시작하기  {queuePreview.length}문장
+          </button>
+        ) : (
+          <div className="doneSection">
+            <p className="doneText">오늘 학습을 완료했어요! 🎉</p>
+            <button className="startBtn" onClick={handleExtraNew}>새 문장 더 학습하기</button>
+            <button className="startBtnSecondary" onClick={handleReviewToday}>오늘 학습한 문장 다시 연습</button>
+          </div>
+        )}
       </div>
 
       <div className="panel">
@@ -1000,7 +1016,7 @@ function SentenceEditor({ settings, sentence, startSingle, onClose, onSaved }: {
           />
         </label>
         <label><span className="labelText">태그 <span className="optional">(쉼표로 구분)</span></span>
-          <input value={draft.tags.join(", ")} onChange={(e) => setDraft({ ...draft, tags: e.target.value.split(",") })} placeholder="예: idiom, passive, business" />
+          <input value={draft.tags.join(", ")} onChange={(e) => setDraft({ ...draft, tags: e.target.value.split(",").map((t) => t.trim()) })} placeholder="예: idiom, passive, business" />
         </label>
         <label>학습 메모
           <textarea value={draft.notes ?? ""} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} placeholder="주의할 표현, 자주 틀리는 부분 등..." />
