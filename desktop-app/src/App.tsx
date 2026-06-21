@@ -1,4 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { getVersion } from "@tauri-apps/api/app";
 import {
   CATEGORIES,
   CATEGORY_LABELS,
@@ -1192,6 +1194,12 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [lastImportAt, setLastImportAt] = useState<number | null>(null);
+  const [appVersion, setAppVersion] = useState("");
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "latest" | "available" | "downloading" | "done">("idle");
+  const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
+  useEffect(() => { getVersion().then(setAppVersion); }, []);
   const [lastExportAt, setLastExportAt] = useState<number | null>(null);
   const [syncMsg, setSyncMsg] = useState("");
   const [setupModalOpen, setSetupModalOpen] = useState(false);
@@ -1204,6 +1212,44 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
     api.getStringSetting(LAST_IMPORT_KEY).then((v) => { if (v) setLastImportAt(Number(v)); });
     api.getStringSetting(LAST_EXPORT_KEY).then((v) => { if (v) setLastExportAt(Number(v)); });
   }, []);
+
+  async function handleCheckUpdate() {
+    setUpdateStatus("checking");
+    try {
+      const upd = await check();
+      if (upd) {
+        setPendingUpdate(upd);
+        setUpdateStatus("available");
+      } else {
+        setUpdateStatus("latest");
+      }
+    } catch {
+      setUpdateStatus("idle");
+    }
+  }
+
+  async function handleInstallUpdate() {
+    if (!pendingUpdate) return;
+    setUpdateStatus("downloading");
+    setDownloadProgress(0);
+    try {
+      let downloaded = 0;
+      let total = 0;
+      await pendingUpdate.downloadAndInstall((event) => {
+        if (event.event === "Started") {
+          total = event.data.contentLength ?? 0;
+        } else if (event.event === "Progress") {
+          downloaded += event.data.chunkLength;
+          if (total > 0) setDownloadProgress(Math.round((downloaded / total) * 100));
+        } else if (event.event === "Finished") {
+          setDownloadProgress(100);
+          setUpdateStatus("done");
+        }
+      });
+    } catch {
+      setUpdateStatus("available");
+    }
+  }
 
   async function update<K extends keyof UserSettings>(key: K, value: UserSettings[K]) {
     await api.setSetting(key, value);
@@ -1386,10 +1432,31 @@ function SettingsView({ settings, setSettings, refresh, sentences }: {
 
       <div className="group">
         <h2>정보</h2>
-        <InfoRow label="버전" value="1.0.0" />
+        <InfoRow label="버전" value={appVersion || "…"} />
         <InfoRow label="저장소" value="기기 로컬 (SQLite)" />
         <InfoRow label="오디오 엔진" value="eSpeak NG / XTTS-v2 어댑터" />
         <InfoRow label="음성 인식" value="Vosk 로컬 모델 (무료)" />
+        <div className="updateSection">
+          {updateStatus === "idle" && (
+            <button className="secondary" onClick={handleCheckUpdate}>업데이트 확인</button>
+          )}
+          {updateStatus === "checking" && <span className="hint">확인 중…</span>}
+          {updateStatus === "latest" && <span className="hint">✓ 최신 버전입니다</span>}
+          {updateStatus === "available" && (
+            <div className="updateAvailable">
+              <span>v{pendingUpdate?.version} 업데이트가 있습니다</span>
+              {pendingUpdate?.body && <small>{pendingUpdate.body}</small>}
+              <button className="primary" onClick={handleInstallUpdate}>다운로드 및 설치</button>
+            </div>
+          )}
+          {updateStatus === "downloading" && (
+            <div className="updateProgress">
+              <span>다운로드 중… {downloadProgress}%</span>
+              <progress value={downloadProgress} max={100} />
+            </div>
+          )}
+          {updateStatus === "done" && <span className="hint">✓ 설치 완료 — 앱이 재시작됩니다</span>}
+        </div>
       </div>
     </section>
     {setupModalOpen && (
