@@ -165,7 +165,7 @@ export default function SessionScreen() {
 
     if (difficulty === 3) {
       if (!isRetry) {
-        await scheduleReview(s.id, direction, 1);
+        await scheduleReview(s.id, direction, 0);
       }
       requeueCurrent();
     } else {

@@ -56,7 +56,7 @@ export async function getDueForReview(now: number = Date.now()): Promise<Sentenc
 export async function getDueWithSentences(
   now: number = Date.now(),
   foreignLanguage?: ForeignLanguage
-): Promise<Array<{ sentence: SentenceEntry; direction: Direction }>> {
+): Promise<Array<{ sentence: SentenceEntry; direction: Direction; intervalDays: number }>> {
   const db = await getDB();
   const params: any[] = [now];
   let langFilter = "";
@@ -65,7 +65,7 @@ export async function getDueWithSentences(
     params.push(foreignLanguage);
   }
   const rows = await db.getAllAsync<any>(
-    `SELECT s.*, sp.direction as sp_direction
+    `SELECT s.*, sp.direction as sp_direction, sp.interval_days as sp_interval_days
      FROM sentence_progress sp
      JOIN sentences s ON s.id = sp.sentence_id
      WHERE sp.next_review_date <= ? AND s.is_draft = 0${langFilter}
@@ -74,6 +74,7 @@ export async function getDueWithSentences(
   );
   return rows.map((row) => ({
     direction: row.sp_direction as Direction,
+    intervalDays: row.sp_interval_days as number,
     sentence: rowToSentence(row),
   }));
 }

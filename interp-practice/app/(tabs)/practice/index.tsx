@@ -35,6 +35,7 @@ export default function PracticeHome() {
   const [foreignLanguage, setForeignLanguage] = useState<ForeignLanguage>("en");
   const [direction, setDirection] = useState<Direction>("en-ko");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [dueCount, setDueCount] = useState(0);
   const [newCount, setNewCount] = useState(0);
   const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
@@ -42,9 +43,10 @@ export default function PracticeHome() {
   const [practiceSettings, setPracticeSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [queueCache, setQueueCache] = useState<{
+    retry: QueueItem[];
     due: QueueItem[];
     newItems: QueueItem[];
-  }>({ due: [], newItems: [] });
+  }>({ retry: [], due: [], newItems: [] });
 
   useFocusEffect(
     useCallback(() => {
@@ -73,19 +75,21 @@ export default function PracticeHome() {
       getStats(),
     ]);
 
-    const dueItems: QueueItem[] = due.map((d) => ({ sentence: d.sentence, direction: d.direction }));
+    const retryItems: QueueItem[] = due.filter((d) => d.intervalDays === 0).map((d) => ({ sentence: d.sentence, direction: d.direction }));
+    const dueItems: QueueItem[] = due.filter((d) => d.intervalDays > 0).map((d) => ({ sentence: d.sentence, direction: d.direction }));
     const newItems: QueueItem[] = newSentences.map((s) => ({ sentence: s, direction }));
 
+    setRetryCount(retryItems.length);
     setDueCount(dueItems.length);
     setNewCount(newItems.length);
-    setQueueCache({ due: dueItems, newItems });
+    setQueueCache({ retry: retryItems, due: dueItems, newItems });
     setHeatmapData(heatmap);
     setStats(statsData);
     setLoading(false);
   }
 
   function handleStart() {
-    let queue = [...queueCache.due, ...queueCache.newItems];
+    let queue = [...queueCache.retry, ...queueCache.due, ...queueCache.newItems];
     if (queue.length === 0) {
       Alert.alert("학습할 문장 없음", "라이브러리에 문장을 추가하거나 복습 일정이 돌아올 때까지 기다려주세요.");
       return;
@@ -95,7 +99,7 @@ export default function PracticeHome() {
     router.push("/practice/session");
   }
 
-  const totalCount = dueCount + newCount;
+  const totalCount = retryCount + dueCount + newCount;
 
   if (loading) {
     return (
@@ -133,6 +137,11 @@ export default function PracticeHome() {
         <View style={styles.queueTitleRow}>
           <Text style={styles.queueTitle}>오늘의 학습</Text>
           <View style={styles.badgeRow}>
+            {retryCount > 0 && (
+              <View style={styles.retryBadge}>
+                <Text style={styles.retryBadgeText}>재도전 {retryCount}</Text>
+              </View>
+            )}
             {dueCount > 0 && (
               <View style={styles.dueBadge}>
                 <Text style={styles.dueBadgeText}>복습 {dueCount}</Text>
@@ -247,6 +256,13 @@ const styles = StyleSheet.create({
   queueTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   queueTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
   badgeRow: { flexDirection: "row", gap: 6 },
+  retryBadge: {
+    backgroundColor: "#FEF3C7",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  retryBadgeText: { fontSize: 12, fontWeight: "700", color: "#D97706" },
   dueBadge: {
     backgroundColor: "#EBF2FF",
     borderRadius: 10,
