@@ -20,6 +20,7 @@ interface SessionState {
 
   queue: QueueItem[];
   queueIndex: number;
+  pendingSplitUri: string | null;
 
   startSession: (sentence: SentenceEntry, direction: Direction) => void;
   startQueue: (items: QueueItem[]) => void;
@@ -32,6 +33,7 @@ interface SessionState {
   setBackInterpText: (text: string) => void;
   setIsPlaying: (val: boolean) => void;
   setIsRecording: (val: boolean) => void;
+  setPendingSplitUri: (uri: string | null) => void;
   reset: () => void;
 }
 
@@ -49,6 +51,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   direction: "en-ko",
   queue: [],
   queueIndex: 0,
+  pendingSplitUri: null,
   ...INITIAL_STEP_STATE,
 
   startSession: (sentence, direction) =>
@@ -140,5 +143,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setBackInterpText: (text) => set({ backInterpText: text }),
   setIsPlaying: (val) => set({ isPlaying: val }),
   setIsRecording: (val) => set({ isRecording: val }),
-  reset: () => set({ sentence: null, queue: [], queueIndex: 0, ...INITIAL_STEP_STATE }),
+  setPendingSplitUri: (uri) => set({ pendingSplitUri: uri }),
+  reset: () => set({ sentence: null, queue: [], queueIndex: 0, pendingSplitUri: null, ...INITIAL_STEP_STATE }),
 }));

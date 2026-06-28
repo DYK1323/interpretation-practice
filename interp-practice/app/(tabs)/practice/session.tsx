@@ -21,7 +21,7 @@ import { CompareView } from "../../../src/components/CompareView";
 import { useSessionStore } from "../../../src/features/session/useSessionStore";
 import { useSTT } from "../../../src/features/session/useSTT";
 import { getNextStep, STEP_DESCRIPTIONS } from "../../../src/features/session/sessionMachine";
-import { saveResult } from "../../../src/db/results";
+import { saveResult, getResultsForSentence } from "../../../src/db/results";
 import { scheduleReview, getProgress } from "../../../src/db/progress";
 import { updateSentenceDifficulty } from "../../../src/db/sentences";
 import { getSetting } from "../../../src/db/settings";
@@ -31,8 +31,9 @@ import { DIFFICULTY_OPTIONS } from "../../../src/types/index";
 export default function SessionScreen() {
   const router = useRouter();
   const { sentence, direction, step, interpRecordingUri, backInterpRecordingUri, backInterpText,
-    queue, queueIndex, setStep, setInterpRecordingUri, setBackInterpRecordingUri, setBackInterpText,
-    advanceQueue, requeueAndAdvance, saveInterpAndAdvanceSplit, reset } = useSessionStore();
+    queue, queueIndex, pendingSplitUri, setStep, setInterpRecordingUri, setBackInterpRecordingUri,
+    setBackInterpText, setPendingSplitUri, advanceQueue, requeueAndAdvance, saveInterpAndAdvanceSplit,
+    reset } = useSessionStore();
 
   const { transcript, isListening, startListening, stopListening } = useSTT(
     direction,
@@ -53,6 +54,13 @@ export default function SessionScreen() {
   const mountedRef = useRef(true);
   const originalQueueLengthRef = useRef(0);
   useEffect(() => () => { mountedRef.current = false; }, []);
+
+  // Bug 1A: restore pendingInterpUri from store if screen remounted during model interp view
+  useEffect(() => {
+    if (pendingSplitUri && step === "LISTEN_RECORD") {
+      setPendingInterpUri(pendingSplitUri);
+    }
+  }, []);
 
   const sttPulse = useRef(new Animated.Value(1)).current;
 
@@ -75,6 +83,15 @@ export default function SessionScreen() {
     setSessionSaved(false);
     setPendingInterpUri(null);
   }, [sentence?.id, direction, queueIndex]);
+
+  // Bug 3: load previous session notes when entering COMPARE
+  useEffect(() => {
+    if (step !== "COMPARE" || notes || !sentence) return;
+    getResultsForSentence(sentence.id, direction).then(prevResults => {
+      const prev = prevResults[0];
+      if (prev?.notes) setNotes(prev.notes);
+    });
+  }, [step]);
 
   useEffect(() => {
     if (queue.length > 0 && !queue[0].isRetry) {
@@ -138,6 +155,7 @@ export default function SessionScreen() {
     if (splitSessionMode && queueIndex < originalQueueLengthRef.current) {
       setInterpRecordingUri(uri);
       setPendingInterpUri(uri);
+      setPendingSplitUri(uri);  // Bug 1A: persist across remounts
     } else {
       setInterpRecordingUri(uri);
       const next = getNextStep("LISTEN_RECORD");
@@ -149,6 +167,7 @@ export default function SessionScreen() {
     if (!pendingInterpUri) return;
     saveInterpAndAdvanceSplit(pendingInterpUri, originalQueueLengthRef.current);
     setPendingInterpUri(null);
+    setPendingSplitUri(null);  // Bug 1A: clear store after advancing
   }
 
   function handleBackStart() {
@@ -214,11 +233,19 @@ export default function SessionScreen() {
   }
 
   function handleRetry() {
-    setStep("LISTEN_RECORD");
-    setInterpRecordingUri("");
-    setBackInterpRecordingUri("");
-    setBackInterpText("");
-    setNotes("");
+    // Bug 2: pass 2 should retry from PLAYBACK_BACK, not LISTEN_RECORD
+    const isPass2 = splitSessionMode && queueIndex >= originalQueueLengthRef.current;
+    if (isPass2) {
+      setStep("PLAYBACK_BACK");
+      setBackInterpRecordingUri("");
+      setBackInterpText("");
+    } else {
+      setStep("LISTEN_RECORD");
+      setInterpRecordingUri("");
+      setBackInterpRecordingUri("");
+      setBackInterpText("");
+    }
+    // Bug 3: preserve notes across retries
     setSessionSaved(false);
   }
 

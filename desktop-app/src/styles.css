@@ -502,6 +502,28 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   background: #FEF3C7 !important;
   border-color: #FDE68A !important;
 }
+.resumeCard {
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.resumeCard p {
+  margin: 0;
+  font-size: 14px;
+  color: #1e40af;
+  font-weight: 600;
+}
+.resumeCardActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
 .doneSection {
   display: flex;
   flex-direction: column;

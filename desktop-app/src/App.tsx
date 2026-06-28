@@ -205,6 +205,9 @@ function App() {
   const [originalQueueLength, setOriginalQueueLength] = useState(0);
   const [sessionStep, setSessionStep] = useState<SessionStep>("LISTEN_RECORD");
   const [sessionDraft, setSessionDraft] = useState({ interpUri: "", backUri: "", backText: "", notes: "" });
+  const [savedSplitSession, setSavedSplitSession] = useState<{
+    queue: QueueItem[]; queueIndex: number; origLen: number;
+  } | null>(null);
   const activeQueueItem = queue.length > 0 ? queue[queueIndex] : null;
 
   function startQueue(items: QueueItem[]) {
@@ -224,11 +227,37 @@ function App() {
     api.initDB().then(setDbPath).then(refresh).catch((error) => alert(String(error)));
   }, []);
 
+  // Bug 3: load previous session notes when entering COMPARE
+  useEffect(() => {
+    if (sessionStep !== "COMPARE" || sessionDraft.notes || !activeQueueItem) return;
+    const prev = results.find(
+      r => r.sentenceId === activeQueueItem.sentence.id && r.direction === activeQueueItem.direction
+    );
+    if (prev?.notes) setSessionDraft(d => ({ ...d, notes: prev.notes! }));
+  }, [sessionStep]);
+
   function exitSession() {
+    // Bug 1: save split session progress before clearing
+    if (settings.splitSessionMode && queue.some(item => item.interpUri)) {
+      setSavedSplitSession({ queue, queueIndex, origLen: originalQueueLength });
+    }
     setQueue([]);
     setQueueIndex(0);
+    setOriginalQueueLength(0);
     setSessionStep("LISTEN_RECORD");
     setSessionDraft({ interpUri: "", backUri: "", backText: "", notes: "" });
+  }
+
+  function handleResumeSplit() {
+    if (!savedSplitSession) return;
+    const { queue: sq, queueIndex: sq_idx, origLen } = savedSplitSession;
+    setQueue(sq);
+    setQueueIndex(sq_idx);
+    setOriginalQueueLength(origLen);
+    const item = sq[sq_idx];
+    setSessionStep(item?.interpUri ? "PLAYBACK_BACK" : "LISTEN_RECORD");
+    setSessionDraft({ interpUri: item?.interpUri ?? "", backUri: "", backText: "", notes: "" });
+    setSavedSplitSession(null);
   }
 
   function handleInterpComplete(uri: string) {
@@ -368,6 +397,9 @@ function App() {
             results={results}
             startQueue={startQueue}
             refresh={refresh}
+            savedSplitSession={savedSplitSession}
+            onResumeSplit={handleResumeSplit}
+            onClearSavedSplit={() => setSavedSplitSession(null)}
           />
         ) : tab === "library" ? (
           <LibraryView settings={settings} sentences={sentences} refresh={refresh} startSingle={(item) => startQueue([item])} />
@@ -381,12 +413,15 @@ function App() {
   );
 }
 
-function PracticeView({ settings, sentences, results, startQueue, refresh }: {
+function PracticeView({ settings, sentences, results, startQueue, refresh, savedSplitSession, onResumeSplit, onClearSavedSplit }: {
   settings: UserSettings;
   sentences: SentenceEntry[];
   results: SessionResult[];
   startQueue: (items: QueueItem[]) => void;
   refresh: () => Promise<void>;
+  savedSplitSession: { queue: QueueItem[]; queueIndex: number; origLen: number } | null;
+  onResumeSplit: () => void;
+  onClearSavedSplit: () => void;
 }) {
   const [direction, setDirection] = useState<Direction>(FOREIGN_LANGUAGE_DIRECTIONS[settings.foreignLanguage][0]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -445,6 +480,16 @@ function PracticeView({ settings, sentences, results, startQueue, refresh }: {
         <div className="statDivider" />
         <div className="statItem"><span>✅</span><strong>{todayCount}</strong><small>오늘</small></div>
       </div>
+
+      {savedSplitSession && (
+        <div className="resumeCard">
+          <p>분리 세션 진행 중 — {savedSplitSession.queueIndex + 1}/{savedSplitSession.origLen}번째</p>
+          <div className="resumeCardActions">
+            <button className="primary" onClick={onResumeSplit}>이어서 계속하기</button>
+            <button className="ghost" onClick={onClearSavedSplit}>취소</button>
+          </div>
+        </div>
+      )}
 
       <div className="queueCard">
         <div className="queueTitleRow">
@@ -680,7 +725,16 @@ function SessionView({ item, index, total, originalQueueLength, step, draft, set
               ))}
             </div>
           </div>
-          <button className="ghost" onClick={() => { setDraft({ interpUri: "", backUri: "", backText: "", notes: "" }); setStep("LISTEN_RECORD"); }}>
+          <button className="ghost" onClick={() => {
+            // Bug 2: pass 2 should retry from PLAYBACK_BACK, not LISTEN_RECORD
+            if (isReviewPass) {
+              setDraft({ interpUri: draft.interpUri, backUri: "", backText: "", notes: draft.notes });
+              setStep("PLAYBACK_BACK");
+            } else {
+              setDraft({ interpUri: "", backUri: "", backText: "", notes: "" });
+              setStep("LISTEN_RECORD");
+            }
+          }}>
             다시 연습
           </button>
         </div>
