@@ -30,7 +30,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 export default function PracticeHome() {
   const router = useRouter();
-  const { startQueue } = useSessionStore();
+  const { startQueue, queue: storeQueue, pendingSplitUri } = useSessionStore();
 
   const [foreignLanguage, setForeignLanguage] = useState<ForeignLanguage>("en");
   const [direction, setDirection] = useState<Direction>("en-ko");
@@ -88,11 +88,29 @@ export default function PracticeHome() {
     setLoading(false);
   }
 
+  function isSplitInProgress() {
+    return practiceSettings.splitSessionMode
+      && (storeQueue.some(item => item.interpRecordingUri) || !!pendingSplitUri);
+  }
+
+  function confirmNewStart(onConfirm: () => void) {
+    if (isSplitInProgress()) {
+      Alert.alert("진행 중인 세션", "분리 세션이 진행 중입니다.", [
+        { text: "이어서 계속", onPress: () => router.push("/practice/session") },
+        { text: "새로 시작", style: "destructive", onPress: onConfirm },
+      ]);
+    } else {
+      onConfirm();
+    }
+  }
+
   function handleStart() {
     let queue = [...queueCache.retry, ...queueCache.due, ...queueCache.newItems];
     if (practiceSettings.shuffleSentences) queue = shuffle(queue);
-    startQueue(queue);
-    router.push("/practice/session");
+    confirmNewStart(() => {
+      startQueue(queue);
+      router.push("/practice/session");
+    });
   }
 
   async function handleExtraNew() {
@@ -103,8 +121,10 @@ export default function PracticeHome() {
     }
     let queue: QueueItem[] = extra.map((s) => ({ sentence: s, direction }));
     if (practiceSettings.shuffleSentences) queue = shuffle(queue);
-    startQueue(queue);
-    router.push("/practice/session");
+    confirmNewStart(() => {
+      startQueue(queue);
+      router.push("/practice/session");
+    });
   }
 
   async function handleReviewToday() {
@@ -115,8 +135,10 @@ export default function PracticeHome() {
     }
     let queue: QueueItem[] = today.map((d) => ({ sentence: d.sentence, direction: d.direction }));
     if (practiceSettings.shuffleSentences) queue = shuffle(queue);
-    startQueue(queue);
-    router.push("/practice/session");
+    confirmNewStart(() => {
+      startQueue(queue);
+      router.push("/practice/session");
+    });
   }
 
   const totalCount = retryCount + dueCount + newCount;
