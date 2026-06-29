@@ -50,6 +50,7 @@ export default function SessionScreen() {
   const [splitSessionMode, setSplitSessionMode] = useState(false);
   const [pendingInterpUri, setPendingInterpUri] = useState<string | null>(null);
   const [sessionSaved, setSessionSaved] = useState(false);
+  const [daysPreview, setDaysPreview] = useState<Record<number, number>>({ 1: 3, 2: 1 });
   const appState = useRef(AppState.currentState);
   const mountedRef = useRef(true);
   const originalQueueLengthRef = useRef(0);
@@ -90,6 +91,18 @@ export default function SessionScreen() {
     getResultsForSentence(sentence.id, direction).then(prevResults => {
       const prev = prevResults[0];
       if (prev?.notes) setNotes(prev.notes);
+    });
+  }, [step]);
+
+  // Show scheduled days preview on difficulty buttons
+  useEffect(() => {
+    if (step !== "COMPARE" || !sentence) return;
+    getProgress(sentence.id, direction).then(prog => {
+      const base = prog?.intervalDays ?? 0;
+      setDaysPreview({
+        1: base > 0 ? Math.max(1, Math.round(base * 3.5)) : 3,
+        2: base > 0 ? Math.max(1, Math.round(base * 2.5)) : 1,
+      });
     });
   }, [step]);
 
@@ -425,6 +438,9 @@ export default function SessionScreen() {
                   >
                     <Text style={styles.difficultyStars}>{label}</Text>
                     <Text style={styles.difficultySublabel}>{sublabel}</Text>
+                    {difficulty !== 3 && (
+                      <Text style={styles.dayPreview}>~{daysPreview[difficulty]}일 후</Text>
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -499,6 +515,7 @@ const styles = StyleSheet.create({
   diffEasy: { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" },
   difficultyStars: { fontSize: 13, fontWeight: "700", color: "#374151" },
   difficultySublabel: { fontSize: 11, color: "#6B7280" },
+  dayPreview: { fontSize: 10, color: "#9CA3AF", marginTop: 2 },
   retryBtn: {
     marginTop: 16,
     paddingVertical: 14,

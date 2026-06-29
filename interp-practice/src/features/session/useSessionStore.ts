@@ -96,12 +96,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (!cur) return;
     const newQueue = [...queue, { ...cur, isRetry: true, interpRecordingUri: undefined }];
     const next = queueIndex + 1;
+    const nextItem = newQueue[next];
+    const hasPreRecorded = !!nextItem?.interpRecordingUri;
     set({
       queue: newQueue,
       queueIndex: next,
       sentence: newQueue[next].sentence,
       direction: newQueue[next].direction,
-      ...INITIAL_STEP_STATE,
+      step: hasPreRecorded ? "PLAYBACK_BACK" : "LISTEN_RECORD",
+      interpRecordingUri: hasPreRecorded ? (nextItem.interpRecordingUri ?? null) : null,
+      backInterpRecordingUri: null,
+      backInterpText: "",
+      isPlaying: false,
+      isRecording: false,
     });
   },
 
