@@ -579,7 +579,18 @@ function SessionView({ item, index, total, originalQueueLength, step, draft, set
   const displayIndex = isReviewPass ? index - origLen : index;
   const displayTotal = settings.splitSessionMode ? origLen : total;
   const [pendingInterpUri, setPendingInterpUri] = useState<string | null>(null);
+  const [daysPreview, setDaysPreview] = useState<Record<number, number>>({ 1: 3, 2: 1 });
   useEffect(() => { setPendingInterpUri(null); }, [index]);
+  useEffect(() => {
+    if (step !== "COMPARE") return;
+    api.getProgress(item.sentence.id, item.direction).then(prog => {
+      const base = prog?.intervalDays ?? 0;
+      setDaysPreview({
+        1: base > 0 ? Math.max(1, Math.round(base * 3.5)) : 3,
+        2: base > 0 ? Math.max(1, Math.round(base * 2.5)) : 1,
+      });
+    });
+  }, [step]);
   const draftRef = useRef(draft);
   useEffect(() => {
     draftRef.current = draft;
@@ -721,6 +732,9 @@ function SessionView({ item, index, total, originalQueueLength, step, draft, set
                 <button key={option.difficulty} onClick={() => onFinish(option.difficulty)}>
                   <strong>{option.label}</strong>
                   <small>{option.sublabel}</small>
+                  {option.difficulty !== 3 && (
+                    <small className="dayPreview">~{daysPreview[option.difficulty]}일 후</small>
+                  )}
                 </button>
               ))}
             </div>
