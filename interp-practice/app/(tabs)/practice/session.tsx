@@ -437,10 +437,9 @@ export default function SessionScreen() {
                     disabled={sessionSaved}
                   >
                     <Text style={styles.difficultyStars}>{label}</Text>
-                    <Text style={styles.difficultySublabel}>{sublabel}</Text>
-                    {difficulty !== 3 && (
-                      <Text style={styles.dayPreview}>~{daysPreview[difficulty]}일 후</Text>
-                    )}
+                    <Text style={styles.difficultySublabel}>
+                      {difficulty === 3 ? sublabel : `${daysPreview[difficulty]}일 후`}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -515,7 +514,6 @@ const styles = StyleSheet.create({
   diffEasy: { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" },
   difficultyStars: { fontSize: 13, fontWeight: "700", color: "#374151" },
   difficultySublabel: { fontSize: 11, color: "#6B7280" },
-  dayPreview: { fontSize: 10, color: "#9CA3AF", marginTop: 2 },
   retryBtn: {
     marginTop: 16,
     paddingVertical: 14,

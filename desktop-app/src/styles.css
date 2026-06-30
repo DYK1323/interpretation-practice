@@ -1305,12 +1305,6 @@ blockquote {
   color: var(--muted);
   font-size: 11px;
 }
-.dayPreview {
-  color: var(--faint);
-  font-size: 10px;
-  display: block;
-  margin-top: 2px;
-}
 
 .settings .panel {
   display: grid;
