@@ -731,10 +731,7 @@ function SessionView({ item, index, total, originalQueueLength, step, draft, set
               {DIFFICULTY_OPTIONS.map((option) => (
                 <button key={option.difficulty} onClick={() => onFinish(option.difficulty)}>
                   <strong>{option.label}</strong>
-                  <small>{option.sublabel}</small>
-                  {option.difficulty !== 3 && (
-                    <small className="dayPreview">~{daysPreview[option.difficulty]}일 후</small>
-                  )}
+                  <small>{option.difficulty === 3 ? option.sublabel : `${daysPreview[option.difficulty]}일 후`}</small>
                 </button>
               ))}
             </div>
