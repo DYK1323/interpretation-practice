@@ -237,7 +237,8 @@ export default function SessionScreen() {
     if (!mountedRef.current) return;
     const hasNext = advanceQueue();
     if (!hasNext) {
-      const total = originalQueueLengthRef.current || queue.length;
+      const origLenAtEnd = originalQueueLengthRef.current || queue.length;
+      const total = splitSessionMode ? queue.length - origLenAtEnd : queue.length;
       reset();
       Alert.alert("완료!", `${total}문장 학습 완료 🎉`, [
         { text: "확인", onPress: () => router.replace("/practice") },
@@ -279,7 +280,11 @@ export default function SessionScreen() {
   const isReviewPass = splitSessionMode && queueIndex >= origLen;
   const passLabel = splitSessionMode ? (isReviewPass ? "복습" : "통역") : null;
   const displayIndex = isReviewPass ? queueIndex - origLen : queueIndex;
-  const displayTotal = splitSessionMode ? origLen : queue.length;
+  // Bug: review pass total must grow with queue.length as retries (재도전) get appended,
+  // otherwise displayIndex can exceed a stale fixed total (e.g. 24/21).
+  const displayTotal = splitSessionMode
+    ? (isReviewPass ? queue.length - origLen : origLen)
+    : queue.length;
 
   return (
     <KeyboardAvoidingView

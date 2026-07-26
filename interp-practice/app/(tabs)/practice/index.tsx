@@ -40,6 +40,7 @@ export default function PracticeHome() {
   const [newCount, setNewCount] = useState(0);
   const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
   const [stats, setStats] = useState({ streak: 0, totalSentences: 0, todayCount: 0 });
+  const [remainingCount, setRemainingCount] = useState(0);
   const [practiceSettings, setPracticeSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [queueCache, setQueueCache] = useState<{
@@ -68,20 +69,33 @@ export default function PracticeHome() {
     }
     const newStudiedToday = await countNewStudiedToday();
     const remainingNew = Math.max(0, s.dailyNewLimit - newStudiedToday);
-    const [due, newSentences, heatmap, statsData] = await Promise.all([
+    const [due, heatmap, statsData] = await Promise.all([
       getDueWithSentences(Date.now(), fl),
-      getNewSentences(activeDir, selectedCategory, remainingNew),
       getHeatmapData(84),
       getStats(),
     ]);
 
-    const retryItems: QueueItem[] = due.filter((d) => d.intervalDays === 0).map((d) => ({ sentence: d.sentence, direction: d.direction }));
-    const dueItems: QueueItem[] = due.filter((d) => d.intervalDays > 0).map((d) => ({ sentence: d.sentence, direction: d.direction }));
+    const allRetryItems: QueueItem[] = due.filter((d) => d.intervalDays === 0).map((d) => ({ sentence: d.sentence, direction: d.direction }));
+    const allDueItems: QueueItem[] = due.filter((d) => d.intervalDays > 0).map((d) => ({ sentence: d.sentence, direction: d.direction }));
+
+    // 하루 총 학습 문장 수 제한: 재도전 > 복습 > 새 문장 순으로 채우고, 넘치는 만큼은 다음 날로 미룸
+    const retryItems = allRetryItems.slice(0, s.dailyTotalLimit);
+    const budgetAfterRetry = Math.max(0, s.dailyTotalLimit - retryItems.length);
+    const dueItems = allDueItems.slice(0, budgetAfterRetry);
+    const budgetAfterDue = Math.max(0, budgetAfterRetry - dueItems.length);
+    const newLimit = Math.min(remainingNew, budgetAfterDue);
+
+    const newSentences = newLimit > 0
+      ? await getNewSentences(activeDir, selectedCategory, newLimit)
+      : [];
     const newItems: QueueItem[] = newSentences.map((s) => ({ sentence: s, direction }));
+
+    const overflow = (allRetryItems.length - retryItems.length) + (allDueItems.length - dueItems.length);
 
     setRetryCount(retryItems.length);
     setDueCount(dueItems.length);
     setNewCount(newItems.length);
+    setRemainingCount(overflow);
     setQueueCache({ retry: retryItems, due: dueItems, newItems });
     setHeatmapData(heatmap);
     setStats(statsData);
@@ -235,6 +249,10 @@ export default function PracticeHome() {
             ))}
           </View>
           <Text style={styles.newLimit}>새 문장은 최대 {practiceSettings.dailyNewLimit}개까지 추가됩니다</Text>
+          <Text style={styles.newLimit}>하루 학습은 복습 포함 최대 {practiceSettings.dailyTotalLimit}개까지 진행됩니다</Text>
+          {remainingCount > 0 && (
+            <Text style={styles.overflowHint}>복습 {remainingCount}개는 내일 이어서 진행돼요</Text>
+          )}
         </View>
 
         {totalCount > 0 ? (
@@ -340,6 +358,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, color: "#374151", fontWeight: "500" },
   chipTextActive: { color: "#FFFFFF" },
   newLimit: { fontSize: 11, color: "#9CA3AF", marginTop: 4 },
+  overflowHint: { fontSize: 11, color: "#D97706", marginTop: 4 },
   startBtn: {
     backgroundColor: "#1A56DB",
     paddingVertical: 18,
