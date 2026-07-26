@@ -56,6 +56,7 @@ export interface UserSettings {
   playbackSpeed: number;
   shuffleSentences: boolean;
   dailyNewLimit: number;
+  dailyTotalLimit: number;
   foreignLanguage: ForeignLanguage;
   splitSessionMode: boolean;
 }
@@ -65,6 +66,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   playbackSpeed: 1.0,
   shuffleSentences: true,
   dailyNewLimit: 10,
+  dailyTotalLimit: 30,
   foreignLanguage: "en",
   splitSessionMode: false,
 };

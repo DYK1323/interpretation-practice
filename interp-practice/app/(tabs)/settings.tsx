@@ -40,6 +40,7 @@ const SPEEDS = [
 const PRESET_SPEEDS = SPEEDS.map((s) => s.value);
 
 const PRESET_LIMITS = [10, 20, 30];
+const PRESET_TOTAL_LIMITS = [20, 30, 50];
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -50,6 +51,7 @@ export default function SettingsScreen() {
   const [exportGuideVisible, setExportGuideVisible] = useState(false);
   const [syncGuideVisible, setSyncGuideVisible] = useState(false);
   const [limitModalVisible, setLimitModalVisible] = useState(false);
+  const [limitModalKey, setLimitModalKey] = useState<"dailyNewLimit" | "dailyTotalLimit">("dailyNewLimit");
   const [limitInput, setLimitInput] = useState("");
   const limitInputRef = useRef<TextInput>(null);
   const [customSpeedText, setCustomSpeedText] = useState("");
@@ -102,7 +104,7 @@ export default function SettingsScreen() {
       Alert.alert("올바른 숫자를 입력하세요 (1~999)");
       return;
     }
-    updateSetting("dailyNewLimit", n);
+    updateSetting(limitModalKey, n);
     setLimitModalVisible(false);
     setLimitInput("");
   }
@@ -453,6 +455,7 @@ export default function SettingsScreen() {
                 !PRESET_LIMITS.includes(settings.dailyNewLimit) && styles.chipActive,
               ]}
               onPress={() => {
+                setLimitModalKey("dailyNewLimit");
                 setLimitInput(String(settings.dailyNewLimit));
                 setLimitModalVisible(true);
               }}
@@ -462,6 +465,42 @@ export default function SettingsScreen() {
                 !PRESET_LIMITS.includes(settings.dailyNewLimit) && styles.chipTextActive,
               ]}>
                 {PRESET_LIMITS.includes(settings.dailyNewLimit) ? "기타" : `${settings.dailyNewLimit}개`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.limitSection}>
+          <Text style={styles.rowTitle}>하루 총 학습 문장 수</Text>
+          <Text style={styles.rowDesc}>재도전·복습·새 문장을 합쳐 하루에 학습할 최대 개수입니다. 초과분은 다음 날로 미뤄집니다.</Text>
+          <View style={styles.chipRow}>
+            {PRESET_TOTAL_LIMITS.map((n) => (
+              <TouchableOpacity
+                key={n}
+                style={[styles.chip, settings.dailyTotalLimit === n && styles.chipActive]}
+                onPress={() => updateSetting("dailyTotalLimit", n)}
+              >
+                <Text style={[styles.chipText, settings.dailyTotalLimit === n && styles.chipTextActive]}>
+                  {n}개
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={[
+                styles.chip,
+                !PRESET_TOTAL_LIMITS.includes(settings.dailyTotalLimit) && styles.chipActive,
+              ]}
+              onPress={() => {
+                setLimitModalKey("dailyTotalLimit");
+                setLimitInput(String(settings.dailyTotalLimit));
+                setLimitModalVisible(true);
+              }}
+            >
+              <Text style={[
+                styles.chipText,
+                !PRESET_TOTAL_LIMITS.includes(settings.dailyTotalLimit) && styles.chipTextActive,
+              ]}>
+                {PRESET_TOTAL_LIMITS.includes(settings.dailyTotalLimit) ? "기타" : `${settings.dailyTotalLimit}개`}
               </Text>
             </TouchableOpacity>
           </View>
@@ -640,7 +679,9 @@ export default function SettingsScreen() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>하루 새 문장 수</Text>
+            <Text style={styles.modalTitle}>
+              {limitModalKey === "dailyTotalLimit" ? "하루 총 학습 문장 수" : "하루 새 문장 수"}
+            </Text>
             <TextInput
               ref={limitInputRef}
               style={styles.modalInput}
